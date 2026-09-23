@@ -150,6 +150,8 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
                 isAnchor={day.id === planner.anchorDayId}
                 agendaItems={planner.agendaItems.filter((i) => i.dayId === day.id)}
                 allocatedBacklogItems={planner.backlogItems.filter((i) => i.allocation?.dayId === day.id)}
+                category={planner.dayCategories[day.id] ?? null}
+                onSetCategory={planner.setDayCategory}
                 onToggleDone={planner.toggleDone}
                 onOpenAgenda={(item) => setModal({ type: 'agenda', item })}
                 onOpenBacklog={(item) => setModal({ type: 'backlog', item })}

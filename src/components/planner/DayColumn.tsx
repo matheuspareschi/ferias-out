@@ -1,8 +1,10 @@
 import { Plus } from 'lucide-react'
 import { WEEKDAY_LONG, dayLabel, formatDayShort, isPastDay } from '@/lib/days'
-import type { AgendaItem, BacklogItem } from '@/lib/types'
+import type { AgendaItem, BacklogItem, DayCategoryId } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { DayCategoryTag } from './DayCategoryTag'
 import { GridBlock } from './GridBlock'
+import { HabitStrip } from './HabitStrip'
 import { TimeGrid } from './TimeGrid'
 import { UnscheduledList } from './UnscheduledList'
 
@@ -12,6 +14,8 @@ interface DayColumnProps {
   isAnchor: boolean
   agendaItems: AgendaItem[]
   allocatedBacklogItems: BacklogItem[]
+  category: DayCategoryId | null
+  onSetCategory: (dayId: string, category: DayCategoryId | null) => void
   onToggleDone: (id: string) => void
   onOpenAgenda: (item: AgendaItem) => void
   onOpenBacklog: (item: BacklogItem) => void
@@ -26,6 +30,8 @@ export function DayColumn({
   isAnchor,
   agendaItems,
   allocatedBacklogItems,
+  category,
+  onSetCategory,
   onToggleDone,
   onOpenAgenda,
   onOpenBacklog,
@@ -34,8 +40,10 @@ export function DayColumn({
   onAddAgenda,
 }: DayColumnProps) {
   const readOnly = isPastDay(dayId)
-  const unscheduled = agendaItems.filter((it) => !it.start)
-  const scheduled = agendaItems.filter((it) => it.start)
+  const habitItems = agendaItems.filter((it) => it.habit)
+  const otherItems = agendaItems.filter((it) => !it.habit)
+  const unscheduled = otherItems.filter((it) => !it.start)
+  const scheduled = otherItems.filter((it) => it.start)
   const label = dayLabel(dayId)
 
   return (
@@ -48,9 +56,16 @@ export function DayColumn({
     >
       <div className="flex items-start justify-between gap-2 border-b border-line px-2.5 py-2">
         <div className="min-w-0">
-          <p className="truncate font-serif text-sm font-semibold capitalize leading-tight">
-            {WEEKDAY_LONG[weekday] ?? weekday}
-          </p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="truncate font-serif text-sm font-semibold capitalize leading-tight">
+              {WEEKDAY_LONG[weekday] ?? weekday}
+            </p>
+            <DayCategoryTag
+              value={category}
+              disabled={readOnly}
+              onChange={(v) => onSetCategory(dayId, v)}
+            />
+          </div>
           <p className="font-mono text-xs text-ink-dim">
             {formatDayShort(dayId)}
             {label ? ` · ${label}` : ''}
@@ -69,6 +84,8 @@ export function DayColumn({
           </button>
         )}
       </div>
+
+      <HabitStrip items={habitItems} disabled={readOnly} onToggle={onToggleDone} />
 
       <div className="px-2 pt-2">
         <UnscheduledList
