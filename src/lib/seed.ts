@@ -1,4 +1,4 @@
-import type { AgendaItem, BacklogItem } from './types'
+import type { AgendaItem, BacklogItem, HabitId } from './types'
 
 let seq = 0
 function nextId(prefix: string): string {
@@ -11,35 +11,39 @@ function agenda(
   title: string,
   start: string | null = null,
   duration: number | null = null,
+  habit?: HabitId,
 ): AgendaItem {
-  return { id: nextId('agenda'), dayId, title, start, duration, done: false }
+  return { id: nextId('agenda'), dayId, title, start, duration, done: false, habit }
 }
 
 /** Rotina-base completa: dias de semana comuns e Retiro. */
 function rotinaCompleta(dayId: string): AgendaItem[] {
   return [
-    agenda(dayId, 'Devocional'),
-    agenda(dayId, 'Alongamento'),
-    agenda(dayId, 'Leitura', null, 30),
-    agenda(dayId, 'Exercício'),
-    agenda(dayId, 'Revisão da faculdade'),
+    agenda(dayId, 'Devocional', null, null, 'devocional'),
+    agenda(dayId, 'Alongamento', null, null, 'alongamento'),
+    agenda(dayId, 'Leitura', null, 30, 'leitura'),
+    agenda(dayId, 'Exercício', null, null, 'exercicio'),
+    agenda(dayId, 'Revisão da faculdade', null, null, 'revisao'),
   ]
 }
 
 /** Rotina de sábado comum: igual à completa, sem revisão da faculdade. */
 function rotinaSabado(dayId: string): AgendaItem[] {
   return [
-    agenda(dayId, 'Devocional'),
-    agenda(dayId, 'Alongamento'),
-    agenda(dayId, 'Leitura', null, 30),
-    agenda(dayId, 'Exercício'),
+    agenda(dayId, 'Devocional', null, null, 'devocional'),
+    agenda(dayId, 'Alongamento', null, null, 'alongamento'),
+    agenda(dayId, 'Leitura', null, 30, 'leitura'),
+    agenda(dayId, 'Exercício', null, null, 'exercicio'),
   ]
 }
 
 /** Rotina reduzida de dia de viagem: só devocional + alongamento (+ leitura, opcional). */
 function rotinaViagem(dayId: string, comLeitura = false): AgendaItem[] {
-  const base = [agenda(dayId, 'Devocional'), agenda(dayId, 'Alongamento')]
-  if (comLeitura) base.push(agenda(dayId, 'Leitura', null, 30))
+  const base = [
+    agenda(dayId, 'Devocional', null, null, 'devocional'),
+    agenda(dayId, 'Alongamento', null, null, 'alongamento'),
+  ]
+  if (comLeitura) base.push(agenda(dayId, 'Leitura', null, 30, 'leitura'))
   return base
 }
 

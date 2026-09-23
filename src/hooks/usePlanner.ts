@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { defaultAnchorDayId } from '@/lib/days'
 import { buildSeedAgendaItems, buildSeedBacklogItems } from '@/lib/seed'
-import type { AgendaItem, BacklogItem } from '@/lib/types'
+import type { AgendaItem, BacklogItem, DayCategoryId, HabitId } from '@/lib/types'
 
 const STORAGE_KEY = 'ferias-planner:v1'
 
@@ -9,6 +9,20 @@ interface PlannerState {
   agendaItems: AgendaItem[]
   backlogItems: BacklogItem[]
   anchorDayId: string
+  dayCategories: Record<string, DayCategoryId>
+}
+
+/** Rotina-base gravada antes da HabitStrip existir não tinha o campo `habit`. */
+const HABIT_TITLE_TO_ID: Record<string, HabitId> = {
+  Devocional: 'devocional',
+  Alongamento: 'alongamento',
+  Leitura: 'leitura',
+  Exercício: 'exercicio',
+  'Revisão da faculdade': 'revisao',
+}
+
+function migrateAgendaItems(items: AgendaItem[]): AgendaItem[] {
+  return items.map((it) => (it.habit ? it : { ...it, habit: HABIT_TITLE_TO_ID[it.title] }))
 }
 
 function loadState(): PlannerState {
@@ -17,7 +31,12 @@ function loadState(): PlannerState {
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<PlannerState>
       if (Array.isArray(parsed.agendaItems) && Array.isArray(parsed.backlogItems) && parsed.anchorDayId) {
-        return parsed as PlannerState
+        return {
+          agendaItems: migrateAgendaItems(parsed.agendaItems),
+          backlogItems: parsed.backlogItems,
+          anchorDayId: parsed.anchorDayId,
+          dayCategories: parsed.dayCategories ?? {},
+        }
       }
     }
   } catch {
@@ -27,6 +46,7 @@ function loadState(): PlannerState {
     agendaItems: buildSeedAgendaItems(),
     backlogItems: buildSeedBacklogItems(),
     anchorDayId: defaultAnchorDayId(),
+    dayCategories: {},
   }
 }
 
@@ -136,10 +156,20 @@ export function usePlanner() {
     setState((s) => ({ ...s, anchorDayId: dayId }))
   }, [])
 
+  const setDayCategory = useCallback((dayId: string, category: DayCategoryId | null) => {
+    setState((s) => {
+      const dayCategories = { ...s.dayCategories }
+      if (category) dayCategories[dayId] = category
+      else delete dayCategories[dayId]
+      return { ...s, dayCategories }
+    })
+  }, [])
+
   return {
     agendaItems: state.agendaItems,
     backlogItems: state.backlogItems,
     anchorDayId: state.anchorDayId,
+    dayCategories: state.dayCategories,
     addAgendaItem,
     updateAgendaItem,
     deleteAgendaItem,
@@ -150,6 +180,7 @@ export function usePlanner() {
     unallocate,
     toggleDone,
     setAnchorDay,
+    setDayCategory,
   }
 }
 

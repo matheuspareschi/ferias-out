@@ -3,6 +3,10 @@ export interface Day {
   weekday: string // "qui"
 }
 
+export type HabitId = 'devocional' | 'alongamento' | 'leitura' | 'exercicio' | 'revisao'
+
+export type DayCategoryId = 'piedade' | 'lazer' | 'geral' | 'livre' | 'outro'
+
 export interface AgendaItem {
   id: string
   dayId: string
@@ -10,6 +14,8 @@ export interface AgendaItem {
   start: string | null // "17:00" ou null se sem horário definido
   duration: number | null // minutos
   done: boolean
+  /** Marca os 5 hábitos diários da rotina-base, exibidos à parte na HabitStrip. */
+  habit?: HabitId
 }
 
 export type BacklogCategory = 'aula' | 'preparo' | 'tarefa'
