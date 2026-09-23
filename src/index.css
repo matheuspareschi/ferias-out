@@ -17,19 +17,20 @@
   --color-line-strong: #b7a578;
 
   --color-rust: #a8481f;
-  --color-rust-dim: #c97246;
-  --color-rust-soft: #f0dccd;
+  --color-rust-dim: #b8582e;
+  --color-rust-soft: #f2c8a3;
 
   --color-olive: #5d6b3d;
-  --color-olive-dim: #7f8f5a;
-  --color-olive-soft: #dfe3cb;
+  --color-olive-dim: #6f7f47;
+  --color-olive-soft: #cfdba0;
 
   --color-gold: #9c7422;
-  --color-gold-dim: #bb9847;
-  --color-gold-soft: #ede0bd;
+  --color-gold-dim: #a37f2e;
+  --color-gold-soft: #f2d571;
 
-  --color-clay: #7a4a3a;
-  --color-clay-soft: #e6d3c4;
+  --color-clay: #6b4030;
+  --color-clay-dim: #8a5a44;
+  --color-clay-soft: #e0b696;
 
   --shadow-card: 0 1px 0 rgba(43, 35, 24, 0.06), 0 2px 6px rgba(43, 35, 24, 0.08);
   --shadow-lifted: 0 8px 24px rgba(43, 35, 24, 0.18);
@@ -46,20 +47,21 @@
     --color-line: #3c3324;
     --color-line-strong: #55492f;
 
-    --color-rust: #d68258;
-    --color-rust-dim: #a85a35;
-    --color-rust-soft: #3a2419;
+    --color-rust: #e08f5c;
+    --color-rust-dim: #c17040;
+    --color-rust-soft: #5c3320;
 
-    --color-olive: #a3b47c;
-    --color-olive-dim: #7f8f5a;
-    --color-olive-soft: #2a2e1c;
+    --color-olive: #b0c085;
+    --color-olive-dim: #8fa066;
+    --color-olive-soft: #3d4526;
 
-    --color-gold: #d9b567;
-    --color-gold-dim: #bb9847;
-    --color-gold-soft: #332912;
+    --color-gold: #e2c077;
+    --color-gold-dim: #c9a355;
+    --color-gold-soft: #4a3a18;
 
-    --color-clay: #c68f74;
-    --color-clay-soft: #33241c;
+    --color-clay: #cf9a7d;
+    --color-clay-dim: #b8846a;
+    --color-clay-soft: #4a3226;
   }
 }
 
@@ -73,20 +75,21 @@
   --color-line: #3c3324;
   --color-line-strong: #55492f;
 
-  --color-rust: #d68258;
-  --color-rust-dim: #a85a35;
-  --color-rust-soft: #3a2419;
+  --color-rust: #e08f5c;
+  --color-rust-dim: #c17040;
+  --color-rust-soft: #5c3320;
 
-  --color-olive: #a3b47c;
-  --color-olive-dim: #7f8f5a;
-  --color-olive-soft: #2a2e1c;
+  --color-olive: #b0c085;
+  --color-olive-dim: #8fa066;
+  --color-olive-soft: #3d4526;
 
-  --color-gold: #d9b567;
-  --color-gold-dim: #bb9847;
-  --color-gold-soft: #332912;
+  --color-gold: #e2c077;
+  --color-gold-dim: #c9a355;
+  --color-gold-soft: #4a3a18;
 
-  --color-clay: #c68f74;
-  --color-clay-soft: #33241c;
+  --color-clay: #cf9a7d;
+  --color-clay-dim: #b8846a;
+  --color-clay-soft: #4a3226;
 }
 
 html {

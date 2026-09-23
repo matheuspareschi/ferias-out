@@ -13,7 +13,7 @@ interface BlockStyle {
 export const ACCENT_STYLES: Record<AccentColor, BlockStyle> = {
   clay: {
     bg: 'bg-clay-soft',
-    border: 'border-clay',
+    border: 'border-clay-dim',
     stripe: 'border-l-clay',
     text: 'text-ink',
     dot: 'bg-clay',
