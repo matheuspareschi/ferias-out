@@ -12,7 +12,14 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
 import { DAYS, dayIndex, isPastDay } from '@/lib/days'
-import { DEFAULT_DURATION, HOUR_HEIGHT, clampStartMinutes, minutesToTime, snapMinutes } from '@/lib/grid'
+import {
+  DEFAULT_DURATION,
+  GRID_START_HOUR,
+  HOUR_HEIGHT,
+  clampStartMinutes,
+  minutesToTime,
+  snapMinutes,
+} from '@/lib/grid'
 import type { BacklogCategory, BacklogSize } from '@/lib/types'
 import { BacklogSidebar } from './BacklogSidebar'
 import { DayColumn } from './DayColumn'
@@ -67,7 +74,7 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
 
   function handleDragEnd(event: DragEndEvent) {
     setActiveDragTitle(null)
-    const { active, over, delta, activatorEvent } = event
+    const { active, over, activatorEvent } = event
     if (!over) return
     const data = active.data.current as DragPayload | undefined
     if (!data) return
@@ -78,10 +85,19 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
     if (overData.type === 'grid' && overData.dayId) {
       const dayId = overData.dayId
       if (isPastDay(dayId)) return
-      const clientY = 'clientY' in activatorEvent ? (activatorEvent as PointerEvent).clientY : 0
-      const pointerY = clientY + delta.y
+
+      // event.delta is scroll-adjusted, so activatorEvent.clientY + delta.y double-counts
+      // any scroll that happened during the drag. active.rect.current.translated is the
+      // dragged node's live (already scroll-corrected) position, so we recover the cursor's
+      // Y by adding back the fixed offset between the cursor and the node's top at pickup.
+      const initialTop = active.rect.current.initial?.top
+      const translatedTop = active.rect.current.translated?.top
+      if (initialTop == null || translatedTop == null) return
+      const clientY = 'clientY' in activatorEvent ? (activatorEvent as PointerEvent).clientY : initialTop
+      const grabOffsetY = clientY - initialTop
+      const pointerY = translatedTop + grabOffsetY
       const relativeY = pointerY - over.rect.top
-      const rawMinutes = 6 * 60 + (relativeY / HOUR_HEIGHT) * 60
+      const rawMinutes = GRID_START_HOUR * 60 + (relativeY / HOUR_HEIGHT) * 60
 
       if (kind === 'agenda') {
         const item = planner.agendaItems.find((i) => i.id === id)
