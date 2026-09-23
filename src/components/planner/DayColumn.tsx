@@ -1,4 +1,5 @@
 import { Plus } from 'lucide-react'
+import { CATEGORY_ACCENT } from '@/lib/categoryStyles'
 import { WEEKDAY_LONG, dayLabel, formatDayShort, isPastDay } from '@/lib/days'
 import type { AgendaItem, BacklogItem, DayCategoryId } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -43,7 +44,8 @@ export function DayColumn({
   const habitItems = agendaItems.filter((it) => it.habit)
   const otherItems = agendaItems.filter((it) => !it.habit)
   const unscheduled = otherItems.filter((it) => !it.start)
-  const scheduled = otherItems.filter((it) => it.start)
+  // Hábitos com horário aparecem tanto na faixa fixa quanto na grade.
+  const scheduled = [...otherItems.filter((it) => it.start), ...habitItems.filter((it) => it.start)]
   const label = dayLabel(dayId)
 
   return (
@@ -107,7 +109,7 @@ export function DayColumn({
               start={item.start!}
               duration={item.duration}
               done={item.done}
-              kind="agenda"
+              kind={item.color ?? 'clay'}
               disabled={readOnly}
               onToggleDone={() => onToggleDone(item.id)}
               onOpen={() => onOpenAgenda(item)}
@@ -122,7 +124,7 @@ export function DayColumn({
               start={item.allocation!.start}
               duration={item.allocation!.duration}
               done={item.done}
-              kind={item.category}
+              kind={CATEGORY_ACCENT[item.category]}
               badge={item.size}
               disabled={readOnly}
               onToggleDone={() => onToggleDone(item.id)}

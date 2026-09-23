@@ -1,7 +1,8 @@
 import { Trash2, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
+import { ACCENT_OPTIONS, ACCENT_STYLES } from '@/lib/categoryStyles'
 import { formatDayShort } from '@/lib/days'
-import type { AgendaItem, BacklogCategory, BacklogItem, BacklogSize } from '@/lib/types'
+import type { AccentColor, AgendaItem, BacklogCategory, BacklogItem, BacklogSize } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 export type ModalState =
@@ -16,7 +17,7 @@ interface EditItemModalProps {
   onSaveAgenda: (
     id: string | null,
     dayId: string,
-    data: { title: string; start: string | null; duration: number | null },
+    data: { title: string; start: string | null; duration: number | null; color: AccentColor },
   ) => void
   onDeleteAgenda: (id: string) => void
   onSaveBacklog: (id: string, data: { title: string; category: BacklogCategory; size: BacklogSize }) => void
@@ -88,6 +89,7 @@ function AgendaForm({
   const [title, setTitle] = useState(item?.title ?? '')
   const [start, setStart] = useState(item?.start ?? '')
   const [duration, setDuration] = useState(item?.duration != null ? String(item.duration) : '')
+  const [color, setColor] = useState<AccentColor>(item?.color ?? 'clay')
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -96,6 +98,7 @@ function AgendaForm({
       title: title.trim(),
       start: start || null,
       duration: duration ? Number(duration) : null,
+      color,
     })
     onClose()
   }
@@ -137,6 +140,27 @@ function AgendaForm({
             className={inputClass}
           />
         </label>
+      </div>
+      <div className="flex flex-col gap-1 text-xs text-ink-dim">
+        Cor
+        <div className="flex gap-1.5">
+          {ACCENT_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              title={opt.label}
+              aria-label={opt.label}
+              aria-pressed={color === opt.value}
+              onClick={() => setColor(opt.value)}
+              className={cn(
+                'size-6 rounded-full border-2',
+                ACCENT_STYLES[opt.value].bg,
+                ACCENT_STYLES[opt.value].border,
+                color === opt.value ? 'ring-2 ring-ink ring-offset-1 ring-offset-paper-raised' : '',
+              )}
+            />
+          ))}
+        </div>
       </div>
       <div className="mt-1 flex items-center justify-between">
         {item ? (

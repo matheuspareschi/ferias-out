@@ -1,5 +1,6 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
+import { ACCENT_STYLES } from '@/lib/categoryStyles'
 import type { AgendaItem } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -17,6 +18,7 @@ export function UnscheduledPill({ item, disabled, onToggleDone, onOpen }: Unsche
     disabled,
     data: { dndId },
   })
+  const styles = ACCENT_STYLES[item.color ?? 'clay']
 
   return (
     <div
@@ -29,7 +31,10 @@ export function UnscheduledPill({ item, disabled, onToggleDone, onOpen }: Unsche
         onOpen()
       }}
       className={cn(
-        'flex select-none touch-none items-center gap-1 rounded-full border border-line-strong bg-paper-raised px-2 py-0.5 text-[10px]',
+        'flex select-none touch-none items-center gap-1 rounded-sm border border-l-[3px] px-2 py-0.5 text-[10px]',
+        styles.bg,
+        styles.border,
+        styles.stripe,
         !disabled && 'cursor-grab active:cursor-grabbing',
         item.done && 'opacity-55 line-through',
         isDragging && 'z-30 opacity-85 shadow-lifted',

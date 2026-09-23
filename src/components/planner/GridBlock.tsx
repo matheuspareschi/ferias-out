@@ -1,7 +1,8 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { BLOCK_STYLES, type BlockKind } from '@/lib/categoryStyles'
+import { ACCENT_STYLES } from '@/lib/categoryStyles'
+import type { AccentColor } from '@/lib/types'
 import {
   DEFAULT_DURATION,
   HOUR_HEIGHT,
@@ -18,7 +19,7 @@ interface GridBlockProps {
   start: string
   duration: number | null
   done: boolean
-  kind: BlockKind
+  kind: AccentColor
   badge?: string
   disabled?: boolean
   onToggleDone: () => void
@@ -51,7 +52,7 @@ export function GridBlock({
 
   const top = topForStart(start)
   const height = Math.max(heightForDuration(previewDuration ?? effectiveDuration), 16)
-  const styles = BLOCK_STYLES[kind]
+  const styles = ACCENT_STYLES[kind]
 
   function handleResizeStart(e: ReactPointerEvent<HTMLDivElement>) {
     e.stopPropagation()
@@ -94,10 +95,11 @@ export function GridBlock({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'absolute left-1 right-1 select-none touch-none overflow-hidden rounded-sm border px-2 py-1 text-left shadow-card',
+        'absolute left-1 right-1 select-none touch-none overflow-hidden rounded-sm border border-l-4 px-2 py-1 text-left shadow-card',
         !disabled && 'cursor-grab active:cursor-grabbing',
         styles.bg,
         styles.border,
+        styles.stripe,
         done && 'opacity-55',
         isDragging && 'z-30 opacity-85 shadow-lifted',
       )}

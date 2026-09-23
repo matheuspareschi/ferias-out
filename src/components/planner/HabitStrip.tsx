@@ -1,3 +1,5 @@
+import { useDraggable } from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
 import { BookOpen, Flame, Footprints, PersonStanding, Search, type LucideIcon } from 'lucide-react'
 import type { AgendaItem, HabitId } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -34,30 +36,57 @@ export function HabitStrip({ items, disabled, onToggle }: HabitStripProps) {
 
   return (
     <div className="flex items-center gap-1 px-2.5 pb-2 pt-2">
-      {ordered.map((item) => {
-        const habit = item.habit as HabitId
-        const Icon = HABIT_ICON[habit]
-        return (
-          <button
-            key={item.id}
-            type="button"
-            title={HABIT_LABEL[habit]}
-            aria-label={HABIT_LABEL[habit]}
-            aria-pressed={item.done}
-            disabled={disabled}
-            onClick={() => onToggle(item.id)}
-            className={cn(
-              'flex size-7 items-center justify-center rounded-sm border transition-colors',
-              item.done
-                ? 'border-gold-dim bg-gold-soft text-gold'
-                : 'border-line text-ink-faint hover:border-line-strong hover:text-ink-dim',
-              disabled && 'pointer-events-none opacity-50',
-            )}
-          >
-            <Icon className="size-3.5" />
-          </button>
-        )
-      })}
+      {ordered.map((item) => (
+        <HabitButton key={item.id} item={item} disabled={disabled} onToggle={() => onToggle(item.id)} />
+      ))}
     </div>
+  )
+}
+
+function HabitButton({
+  item,
+  disabled,
+  onToggle,
+}: {
+  item: AgendaItem
+  disabled?: boolean
+  onToggle: () => void
+}) {
+  const habit = item.habit as HabitId
+  const Icon = HABIT_ICON[habit]
+  const dndId = `agenda:${item.id}`
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: dndId,
+    disabled,
+    data: { dndId },
+  })
+
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      title={item.start ? `${HABIT_LABEL[habit]} · ${item.start}` : `${HABIT_LABEL[habit]} — arraste para agendar`}
+      aria-label={HABIT_LABEL[habit]}
+      disabled={disabled}
+      onClick={onToggle}
+      style={{ transform: transform ? CSS.Translate.toString(transform) : undefined }}
+      {...listeners}
+      {...attributes}
+      aria-pressed={item.done}
+      className={cn(
+        'relative flex size-7 select-none touch-none items-center justify-center rounded-sm border transition-colors',
+        !disabled && 'cursor-grab active:cursor-grabbing',
+        item.done
+          ? 'border-gold-dim bg-gold-soft text-gold'
+          : 'border-line text-ink-faint hover:border-line-strong hover:text-ink-dim',
+        disabled && 'pointer-events-none opacity-50',
+        isDragging && 'z-30 opacity-85 shadow-lifted',
+      )}
+    >
+      <Icon className="size-3.5" />
+      {item.start && !item.done && (
+        <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-clay" aria-hidden />
+      )}
+    </button>
   )
 }

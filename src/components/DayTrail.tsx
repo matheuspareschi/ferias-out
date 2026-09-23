@@ -12,7 +12,7 @@ export function DayTrail({ anchorDayId, onSelect }: DayTrailProps) {
   return (
     <nav
       aria-label="Trilha dos 19 dias da viagem"
-      className="flex gap-1.5 overflow-x-auto pb-2 pt-1 px-1 -mx-1"
+      className="flex gap-1.5 overflow-x-auto px-1 py-1 -mx-1"
     >
       {DAYS.map((day) => {
         const isAnchor = day.id === anchorDayId
@@ -27,8 +27,8 @@ export function DayTrail({ anchorDayId, onSelect }: DayTrailProps) {
             onClick={() => onSelect(day.id)}
             aria-current={isAnchor ? 'date' : undefined}
             className={cn(
-              'group relative flex shrink-0 flex-col items-center gap-0.5 rounded-md border px-2.5 py-1.5 transition-colors',
-              'min-w-13',
+              'group relative flex shrink-0 flex-col items-center gap-0.5 rounded-md border px-2 py-1 transition-colors',
+              'min-w-12',
               isAnchor
                 ? 'border-rust bg-rust text-paper-raised shadow-card'
                 : 'border-line bg-paper-raised/60 text-ink hover:border-line-strong hover:bg-paper-raised',

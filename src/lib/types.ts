@@ -7,6 +7,9 @@ export type HabitId = 'devocional' | 'alongamento' | 'leitura' | 'exercicio' | '
 
 export type DayCategoryId = 'piedade' | 'lazer' | 'geral' | 'livre' | 'outro'
 
+/** Paleta de destaque usada nos blocos — cor padrão do compromisso ou escolha do usuário. */
+export type AccentColor = 'clay' | 'rust' | 'olive' | 'gold' | 'ink'
+
 export interface AgendaItem {
   id: string
   dayId: string
@@ -16,6 +19,8 @@ export interface AgendaItem {
   done: boolean
   /** Marca os 5 hábitos diários da rotina-base, exibidos à parte na HabitStrip. */
   habit?: HabitId
+  /** Cor de destaque escolhida pelo usuário; sem valor usa o padrão 'clay'. */
+  color?: AccentColor
 }
 
 export type BacklogCategory = 'aula' | 'preparo' | 'tarefa'

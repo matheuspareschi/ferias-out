@@ -66,13 +66,14 @@ export function usePlanner() {
   }, [state])
 
   const addAgendaItem = useCallback(
-    (dayId: string, data: Partial<Pick<AgendaItem, 'title' | 'start' | 'duration'>> = {}) => {
+    (dayId: string, data: Partial<Pick<AgendaItem, 'title' | 'start' | 'duration' | 'color'>> = {}) => {
       const item: AgendaItem = {
         id: newId('agenda'),
         dayId,
         title: data.title?.trim() || 'Novo compromisso',
         start: data.start ?? null,
         duration: data.duration ?? null,
+        color: data.color,
         done: false,
       }
       setState((s) => ({ ...s, agendaItems: [...s.agendaItems, item] }))

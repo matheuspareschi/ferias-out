@@ -7,18 +7,17 @@ export default function App() {
 
   return (
     <div className="flex h-dvh flex-col bg-paper text-ink">
-      <header className="flex items-baseline justify-between border-b border-line px-4 py-3 sm:px-6">
-        <div>
-          <h1 className="font-serif text-xl font-semibold sm:text-2xl">Roteiro de férias</h1>
-          <p className="font-mono text-[11px] text-ink-dim">24/09 — 12/10/2026</p>
+      <header className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-line px-4 py-2 sm:px-6">
+        <div className="shrink-0">
+          <h1 className="font-serif text-lg font-semibold leading-tight sm:text-xl">Roteiro de férias</h1>
+          <p className="font-mono text-[10px] text-ink-dim">24/09 – 12/10/2026</p>
+        </div>
+        <div className="min-w-0 flex-1">
+          <DayTrail anchorDayId={planner.anchorDayId} onSelect={planner.setAnchorDay} />
         </div>
       </header>
 
-      <div className="border-b border-line px-4 sm:px-6">
-        <DayTrail anchorDayId={planner.anchorDayId} onSelect={planner.setAnchorDay} />
-      </div>
-
-      <main className="flex flex-1 flex-col overflow-y-auto p-4 sm:p-6 lg:overflow-hidden">
+      <main className="flex flex-1 flex-col overflow-y-auto p-3 sm:p-4 lg:overflow-hidden">
         <PlannerBoard planner={planner} />
       </main>
     </div>

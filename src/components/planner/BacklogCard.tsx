@@ -1,7 +1,7 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { formatDayShort } from '@/lib/days'
-import { BLOCK_STYLES } from '@/lib/categoryStyles'
+import { ACCENT_STYLES, CATEGORY_ACCENT } from '@/lib/categoryStyles'
 import type { BacklogItem } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -17,7 +17,7 @@ export function BacklogCard({ item, onToggleDone, onOpen }: BacklogCardProps) {
     id: dndId,
     data: { dndId },
   })
-  const styles = BLOCK_STYLES[item.category]
+  const styles = ACCENT_STYLES[CATEGORY_ACCENT[item.category]]
 
   return (
     <div
@@ -30,9 +30,10 @@ export function BacklogCard({ item, onToggleDone, onOpen }: BacklogCardProps) {
         onOpen()
       }}
       className={cn(
-        'flex select-none touch-none cursor-grab items-start gap-2 rounded-sm border px-2.5 py-2 shadow-card active:cursor-grabbing',
+        'flex select-none touch-none cursor-grab items-start gap-2 rounded-sm border border-l-4 px-2.5 py-2 shadow-card active:cursor-grabbing',
         styles.bg,
         styles.border,
+        styles.stripe,
         item.done && 'opacity-55',
         isDragging && 'z-30 opacity-85 shadow-lifted',
       )}
