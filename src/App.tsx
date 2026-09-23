@@ -1,8 +1,32 @@
-import { Moon, Sun } from 'lucide-react'
+import { Cloud, CloudOff, Moon, RefreshCw, Sun } from 'lucide-react'
 import { DayTrail } from '@/components/DayTrail'
 import { PlannerBoard } from '@/components/planner/PlannerBoard'
 import { usePlanner } from '@/hooks/usePlanner'
 import { useTheme } from '@/hooks/useTheme'
+import { cn } from '@/lib/utils'
+
+function SyncIndicator({ status }: { status: ReturnType<typeof usePlanner>['syncStatus'] }) {
+  if (status === 'disabled') return null
+  if (status === 'syncing') {
+    return (
+      <span title="Sincronizando…" className="flex items-center text-ink-faint">
+        <RefreshCw className="size-3.5 animate-spin" />
+      </span>
+    )
+  }
+  if (status === 'error') {
+    return (
+      <span title="Falha ao sincronizar — dados salvos só neste aparelho por enquanto" className="flex items-center text-rust">
+        <CloudOff className="size-3.5" />
+      </span>
+    )
+  }
+  return (
+    <span title="Sincronizado" className="flex items-center text-olive">
+      <Cloud className="size-3.5" />
+    </span>
+  )
+}
 
 export default function App() {
   const planner = usePlanner()
@@ -18,15 +42,20 @@ export default function App() {
         <div className="min-w-0 flex-1">
           <DayTrail anchorDayId={planner.anchorDayId} onSelect={planner.setAnchorDay} />
         </div>
-        <button
-          type="button"
-          onClick={toggle}
-          className="flex shrink-0 items-center gap-1.5 rounded-sm border border-line px-2 py-1.5 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
-          aria-label={theme === 'dark' ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
-          title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
-        >
-          {theme === 'dark' ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <SyncIndicator status={planner.syncStatus} />
+          <button
+            type="button"
+            onClick={toggle}
+            className={cn(
+              'flex items-center gap-1.5 rounded-sm border border-line px-2 py-1.5 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink',
+            )}
+            aria-label={theme === 'dark' ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
+            title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+          >
+            {theme === 'dark' ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
+          </button>
+        </div>
       </header>
 
       <main className="flex flex-1 flex-col overflow-y-auto p-3 sm:p-4 lg:overflow-hidden">
