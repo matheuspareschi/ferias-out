@@ -2,6 +2,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { formatDayShort } from '@/lib/days'
 import { ACCENT_STYLES, CATEGORY_ACCENT } from '@/lib/categoryStyles'
+import { backlogCardDndId } from '@/lib/dnd'
 import type { BacklogItem } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -12,7 +13,7 @@ interface BacklogCardProps {
 }
 
 export function BacklogCard({ item, onToggleDone, onOpen }: BacklogCardProps) {
-  const dndId = `backlog:${item.id}`
+  const dndId = backlogCardDndId(item.id)
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: dndId,
     data: { dndId },

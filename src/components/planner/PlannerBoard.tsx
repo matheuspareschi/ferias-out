@@ -12,6 +12,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
 import { DAYS, dayIndex, isPastDay } from '@/lib/days'
+import { splitDndId } from '@/lib/dnd'
 import {
   DEFAULT_DURATION,
   GRID_START_HOUR,
@@ -36,11 +37,6 @@ interface DragPayload {
 interface DropPayload {
   type: 'grid' | 'unscheduled' | 'sidebar'
   dayId?: string
-}
-
-function splitDndId(dndId: string): { kind: 'agenda' | 'backlog'; id: string } {
-  const sep = dndId.indexOf(':')
-  return { kind: dndId.slice(0, sep) as 'agenda' | 'backlog', id: dndId.slice(sep + 1) }
 }
 
 export function PlannerBoard({ planner }: PlannerBoardProps) {
@@ -213,6 +209,7 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
         onSaveBacklog={(id, data) => planner.updateBacklogItem(id, data)}
         onDeleteBacklog={planner.deleteBacklogItem}
         onUnallocate={planner.unallocate}
+        onReallocate={planner.allocate}
       />
     </DndContext>
   )

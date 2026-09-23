@@ -23,6 +23,7 @@ interface EditItemModalProps {
   onSaveBacklog: (id: string, data: { title: string; category: BacklogCategory; size: BacklogSize }) => void
   onDeleteBacklog: (id: string) => void
   onUnallocate: (id: string) => void
+  onReallocate: (id: string, dayId: string, start: string, duration: number) => void
 }
 
 const inputClass =
@@ -37,6 +38,7 @@ export function EditItemModal({
   onSaveBacklog,
   onDeleteBacklog,
   onUnallocate,
+  onReallocate,
 }: EditItemModalProps) {
   if (!state) return null
 
@@ -56,6 +58,7 @@ export function EditItemModal({
             onSave={onSaveBacklog}
             onDelete={onDeleteBacklog}
             onUnallocate={onUnallocate}
+            onReallocate={onReallocate}
             onClose={onClose}
           />
         ) : (
@@ -190,22 +193,29 @@ function BacklogForm({
   onSave,
   onDelete,
   onUnallocate,
+  onReallocate,
   onClose,
 }: {
   item: BacklogItem
   onSave: EditItemModalProps['onSaveBacklog']
   onDelete: EditItemModalProps['onDeleteBacklog']
   onUnallocate: EditItemModalProps['onUnallocate']
+  onReallocate: EditItemModalProps['onReallocate']
   onClose: () => void
 }) {
   const [title, setTitle] = useState(item.title)
   const [category, setCategory] = useState<BacklogCategory>(item.category)
   const [size, setSize] = useState<BacklogSize>(item.size)
+  const [start, setStart] = useState(item.allocation?.start ?? '')
+  const [duration, setDuration] = useState(item.allocation ? String(item.allocation.duration) : '')
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
     onSave(item.id, { title: title.trim(), category, size })
+    if (item.allocation && start) {
+      onReallocate(item.id, item.allocation.dayId, start, duration ? Number(duration) : item.allocation.duration)
+    }
     onClose()
   }
 
@@ -255,13 +265,42 @@ function BacklogForm({
         </div>
       </div>
       {item.allocation && (
-        <div className="flex items-center justify-between rounded-sm border border-line bg-paper px-2 py-1.5 text-xs text-ink-dim">
-          <span>
-            alocado em {formatDayShort(item.allocation.dayId)} às {item.allocation.start}
-          </span>
-          <button type="button" onClick={() => onUnallocate(item.id)} className="text-rust hover:underline">
-            remover
-          </button>
+        <div className="flex flex-col gap-2 rounded-sm border border-line bg-paper p-2">
+          <div className="flex items-center justify-between text-xs text-ink-dim">
+            <span>alocado em {formatDayShort(item.allocation.dayId)}</span>
+            <button
+              type="button"
+              onClick={() => {
+                onUnallocate(item.id)
+                onClose()
+              }}
+              className="text-rust hover:underline"
+            >
+              remover
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <label className={labelClass}>
+              Horário
+              <input
+                type="time"
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+                className={inputClass}
+              />
+            </label>
+            <label className={labelClass}>
+              Duração (min)
+              <input
+                type="number"
+                min={15}
+                step={5}
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                className={inputClass}
+              />
+            </label>
+          </div>
         </div>
       )}
       <div className="mt-1 flex items-center justify-between">

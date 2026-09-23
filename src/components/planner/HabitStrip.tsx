@@ -1,6 +1,7 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { BookOpen, Flame, Footprints, PersonStanding, Search, type LucideIcon } from 'lucide-react'
+import { habitDndId } from '@/lib/dnd'
 import type { AgendaItem, HabitId } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -54,7 +55,7 @@ function HabitButton({
 }) {
   const habit = item.habit as HabitId
   const Icon = HABIT_ICON[habit]
-  const dndId = `agenda:${item.id}`
+  const dndId = habitDndId(item.id)
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: dndId,
     disabled,

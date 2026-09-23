@@ -1,6 +1,7 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { ACCENT_STYLES } from '@/lib/categoryStyles'
+import { agendaDndId } from '@/lib/dnd'
 import type { AgendaItem } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -12,7 +13,7 @@ interface UnscheduledPillProps {
 }
 
 export function UnscheduledPill({ item, disabled, onToggleDone, onOpen }: UnscheduledPillProps) {
-  const dndId = `agenda:${item.id}`
+  const dndId = agendaDndId(item.id)
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: dndId,
     disabled,

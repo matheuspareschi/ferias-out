@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react'
 import { CATEGORY_ACCENT } from '@/lib/categoryStyles'
 import { WEEKDAY_LONG, dayLabel, formatDayShort, isPastDay } from '@/lib/days'
+import { agendaDndId, backlogAllocDndId } from '@/lib/dnd'
 import type { AgendaItem, BacklogItem, DayCategoryId } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { DayCategoryTag } from './DayCategoryTag'
@@ -104,7 +105,7 @@ export function DayColumn({
           {scheduled.map((item) => (
             <GridBlock
               key={item.id}
-              dndId={`agenda:${item.id}`}
+              dndId={agendaDndId(item.id)}
               title={item.title}
               start={item.start!}
               duration={item.duration}
@@ -119,7 +120,7 @@ export function DayColumn({
           {allocatedBacklogItems.map((item) => (
             <GridBlock
               key={item.id}
-              dndId={`backlog:${item.id}`}
+              dndId={backlogAllocDndId(item.id)}
               title={item.title}
               start={item.allocation!.start}
               duration={item.allocation!.duration}
