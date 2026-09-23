@@ -1,32 +1,35 @@
-# React + TypeScript + Vite
+# Roteiro de férias — 24/09 a 12/10/2026
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Planner pessoal de férias: backlog editável de tarefas flutuantes + grade de
+horário por dia, navegável em janela deslizante de 3 dias.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+React + TypeScript + Vite + Tailwind CSS v4 + dnd-kit. Persistência via
+`localStorage` (uso pessoal, sem sync entre dispositivos).
 
-## React Compiler
+## Rodando localmente
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```sh
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Modelo
+
+- **AgendaItem** — compromissos "fixos" do roteiro (podem ou não ter
+  horário definido; sem horário aparecem na mini-lista "sem horário" no
+  topo da coluna do dia).
+- **BacklogItem** — tarefas flutuantes (aula / preparo / tarefa), com
+  tamanho P/M/G. Podem ser arrastadas para um dia/horário como sugestão
+  visual (`allocation`); isso não remove o item do backlog nem trava sua
+  conclusão — ele só some da lista quando marcado como feito.
+
+Dias anteriores ao dia atual são somente leitura; hoje em diante é editável.
+
+## Scripts
+
+- `npm run dev` — servidor de desenvolvimento
+- `npm run build` — build de produção (`tsc -b && vite build`)
+- `npm run lint` — oxlint
+- `npm run preview` — preview do build

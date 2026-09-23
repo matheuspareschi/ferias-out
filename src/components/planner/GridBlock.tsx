@@ -136,6 +136,7 @@ export function GridBlock({
       {!disabled && (
         <div
           onPointerDown={handleResizeStart}
+          onClick={(e) => e.stopPropagation()}
           className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize"
           aria-hidden
         />
