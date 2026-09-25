@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { defaultAnchorDayId } from '@/lib/days'
 import { buildSeedAgendaItems, buildSeedBacklogItems } from '@/lib/seed'
 import { SYNC_ENABLED, supabase } from '@/lib/supabaseClient'
-import type { AgendaItem, BacklogItem, DayCategoryId, HabitId } from '@/lib/types'
+import type { AgendaItem, BacklogItem, DayCategoryId, HabitId, PeriodId } from '@/lib/types'
 
 const STORAGE_KEY = 'ferias-planner:v1'
 const SYNC_TABLE = 'planner_state'
@@ -26,8 +26,102 @@ const HABIT_TITLE_TO_ID: Record<string, HabitId> = {
   'Revisão da faculdade': 'revisao',
 }
 
-function migrateAgendaItems(items: AgendaItem[]): AgendaItem[] {
-  return items.map((it) => (it.habit ? it : { ...it, habit: HABIT_TITLE_TO_ID[it.title] }))
+function periodForHour(hour: number): PeriodId {
+  if (hour < 12) return 'manha'
+  if (hour < 18) return 'tarde'
+  return 'noite'
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0')
+}
+
+/** Dados como eram salvos antes da troca de horário/duração por período. */
+interface LegacyAgendaItem extends Partial<AgendaItem> {
+  id: string
+  dayId: string
+  title: string
+  start?: string | null
+  duration?: number | null
+}
+
+interface LegacyAllocation {
+  dayId: string
+  period?: PeriodId
+  order?: number
+  start?: string
+  duration?: number
+}
+
+interface LegacyBacklogItem extends Omit<BacklogItem, 'allocation'> {
+  allocation?: LegacyAllocation
+}
+
+function migrateAgendaItems(rawItems: LegacyAgendaItem[]): AgendaItem[] {
+  const orderCounters = new Map<string, number>()
+  function nextOrder(dayId: string, period: PeriodId | null): number {
+    const key = `${dayId}:${period ?? 'none'}`
+    const n = orderCounters.get(key) ?? 0
+    orderCounters.set(key, n + 1)
+    return n
+  }
+
+  return rawItems.map((raw) => {
+    const habit = raw.habit ?? HABIT_TITLE_TO_ID[raw.title]
+    let period: PeriodId | null = raw.period ?? null
+    let timeNote = raw.timeNote
+
+    if (raw.period === undefined && raw.start) {
+      const [h, m] = raw.start.split(':').map(Number)
+      period = periodForHour(h)
+      if (raw.duration) {
+        const endMinutes = h * 60 + m + raw.duration
+        const end = `${pad2(Math.floor(endMinutes / 60) % 24)}:${pad2(endMinutes % 60)}`
+        timeNote = end === raw.start ? raw.start : `${raw.start}–${end}`
+      } else {
+        timeNote = raw.start
+      }
+    }
+
+    const order = raw.order ?? nextOrder(raw.dayId, period)
+
+    return {
+      id: raw.id,
+      dayId: raw.dayId,
+      title: raw.title,
+      period,
+      order,
+      timeNote,
+      done: raw.done ?? false,
+      habit,
+      color: raw.color,
+    }
+  })
+}
+
+function migrateBacklogItems(rawItems: LegacyBacklogItem[]): BacklogItem[] {
+  const orderCounters = new Map<string, number>()
+  function nextOrder(dayId: string, period: PeriodId): number {
+    const key = `${dayId}:${period}`
+    const n = orderCounters.get(key) ?? 0
+    orderCounters.set(key, n + 1)
+    return n
+  }
+
+  return rawItems.map((raw) => {
+    const legacyAlloc = raw.allocation
+    if (!legacyAlloc) return { ...raw, allocation: undefined }
+
+    let period = legacyAlloc.period
+    if (!period && legacyAlloc.start) {
+      const [h] = legacyAlloc.start.split(':').map(Number)
+      period = periodForHour(h)
+    }
+    if (!period) return { ...raw, allocation: undefined }
+
+    const order = legacyAlloc.order ?? nextOrder(legacyAlloc.dayId, period)
+    return { ...raw, allocation: { dayId: legacyAlloc.dayId, period, order } }
+  })
 }
 
 /** Normaliza um blob salvo (localStorage ou Supabase), migrando campos antigos. */
@@ -36,8 +130,8 @@ function normalizeState(parsed: Partial<PlannerState>): PlannerState | null {
     return null
   }
   return {
-    agendaItems: migrateAgendaItems(parsed.agendaItems),
-    backlogItems: parsed.backlogItems,
+    agendaItems: migrateAgendaItems(parsed.agendaItems as LegacyAgendaItem[]),
+    backlogItems: migrateBacklogItems(parsed.backlogItems as LegacyBacklogItem[]),
     anchorDayId: parsed.anchorDayId,
     dayCategories: parsed.dayCategories ?? {},
   }
@@ -162,13 +256,17 @@ export function usePlanner() {
   }, [])
 
   const addAgendaItem = useCallback(
-    (dayId: string, data: Partial<Pick<AgendaItem, 'title' | 'start' | 'duration' | 'color'>> = {}) => {
+    (
+      dayId: string,
+      data: Partial<Pick<AgendaItem, 'title' | 'period' | 'order' | 'timeNote' | 'color'>> = {},
+    ) => {
       const item: AgendaItem = {
         id: newId('agenda'),
         dayId,
         title: data.title?.trim() || 'Novo compromisso',
-        start: data.start ?? null,
-        duration: data.duration ?? null,
+        period: data.period ?? null,
+        order: data.order ?? 0,
+        timeNote: data.timeNote,
         color: data.color,
         done: false,
       }
@@ -212,12 +310,12 @@ export function usePlanner() {
     setState((s) => ({ ...s, backlogItems: s.backlogItems.filter((it) => it.id !== id) }))
   }, [])
 
-  /** Aloca um BacklogItem numa data/horário — sugestão visual, não trava o item. */
-  const allocate = useCallback((itemId: string, dayId: string, start: string, duration: number) => {
+  /** Aloca um BacklogItem num dia/período — sugestão visual, não trava o item. */
+  const allocate = useCallback((itemId: string, dayId: string, period: PeriodId, order: number) => {
     setState((s) => ({
       ...s,
       backlogItems: s.backlogItems.map((it) =>
-        it.id === itemId ? { ...it, allocation: { dayId, start, duration } } : it,
+        it.id === itemId ? { ...it, allocation: { dayId, period, order } } : it,
       ),
     }))
   }, [])

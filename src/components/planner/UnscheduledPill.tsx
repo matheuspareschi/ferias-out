@@ -1,5 +1,6 @@
-import { useDraggable } from '@dnd-kit/core'
+import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { Checkbox } from '@/components/Checkbox'
 import { ACCENT_STYLES } from '@/lib/categoryStyles'
 import { agendaDndId } from '@/lib/dnd'
 import type { AgendaItem } from '@/lib/types'
@@ -14,7 +15,7 @@ interface UnscheduledPillProps {
 
 export function UnscheduledPill({ item, disabled, onToggleDone, onOpen }: UnscheduledPillProps) {
   const dndId = agendaDndId(item.id)
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: dndId,
     disabled,
     data: { dndId },
@@ -24,7 +25,7 @@ export function UnscheduledPill({ item, disabled, onToggleDone, onOpen }: Unsche
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: transform ? CSS.Translate.toString(transform) : undefined }}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
       {...listeners}
       {...attributes}
       onClick={(e) => {
@@ -41,14 +42,7 @@ export function UnscheduledPill({ item, disabled, onToggleDone, onOpen }: Unsche
         isDragging && 'z-30 opacity-85 shadow-lifted',
       )}
     >
-      <input
-        type="checkbox"
-        checked={item.done}
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-        onChange={onToggleDone}
-        className="size-2.5 accent-rust"
-      />
+      <Checkbox checked={item.done} onChange={onToggleDone} size="sm" />
       <span className="max-w-32 truncate">{item.title}</span>
     </div>
   )

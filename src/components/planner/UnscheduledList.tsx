@@ -1,4 +1,6 @@
 import { useDroppable } from '@dnd-kit/core'
+import { SortableContext } from '@dnd-kit/sortable'
+import { agendaDndId, unassignedContainerId } from '@/lib/dnd'
 import type { AgendaItem } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { UnscheduledPill } from './UnscheduledPill'
@@ -12,10 +14,11 @@ interface UnscheduledListProps {
 }
 
 export function UnscheduledList({ dayId, items, disabled, onToggleDone, onOpen }: UnscheduledListProps) {
+  const containerId = unassignedContainerId(dayId)
   const { setNodeRef, isOver } = useDroppable({
-    id: `unscheduled:${dayId}`,
+    id: containerId,
     disabled,
-    data: { type: 'unscheduled', dayId },
+    data: { type: 'unassigned', dayId },
   })
 
   return (
@@ -26,18 +29,20 @@ export function UnscheduledList({ dayId, items, disabled, onToggleDone, onOpen }
         isOver && !disabled && 'border-line-strong bg-gold-soft/40',
       )}
     >
-      {items.length === 0 && (
-        <span className="px-1 py-0.5 font-mono text-[9px] text-ink-faint">sem horário</span>
-      )}
-      {items.map((item) => (
-        <UnscheduledPill
-          key={item.id}
-          item={item}
-          disabled={disabled}
-          onToggleDone={() => onToggleDone(item.id)}
-          onOpen={() => onOpen(item)}
-        />
-      ))}
+      <SortableContext id={containerId} items={items.map((it) => agendaDndId(it.id))}>
+        {items.length === 0 && (
+          <span className="px-1 py-0.5 font-mono text-[9px] text-ink-faint">sem período</span>
+        )}
+        {items.map((item) => (
+          <UnscheduledPill
+            key={item.id}
+            item={item}
+            disabled={disabled}
+            onToggleDone={() => onToggleDone(item.id)}
+            onOpen={() => onOpen(item)}
+          />
+        ))}
+      </SortableContext>
     </div>
   )
 }

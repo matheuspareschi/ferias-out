@@ -1,27 +1,11 @@
-import {
-  DndContext,
-  DragOverlay,
-  PointerSensor,
-  pointerWithin,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragStartEvent,
-} from '@dnd-kit/core'
+import { DndContext, DragOverlay, PointerSensor, pointerWithin, useSensor, useSensors } from '@dnd-kit/core'
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
 import { DAYS, dayIndex, isPastDay } from '@/lib/days'
-import { splitDndId } from '@/lib/dnd'
-import {
-  DEFAULT_DURATION,
-  GRID_START_HOUR,
-  HOUR_HEIGHT,
-  clampStartMinutes,
-  minutesToTime,
-  snapMinutes,
-} from '@/lib/grid'
-import type { BacklogCategory, BacklogSize } from '@/lib/types'
+import { agendaDndId, backlogAllocDndId, type ContainerRef, parseContainerId, splitDndId } from '@/lib/dnd'
+import type { BacklogCategory, BacklogSize, PeriodId } from '@/lib/types'
 import { BacklogSidebar } from './BacklogSidebar'
 import { DayColumn } from './DayColumn'
 import { EditItemModal, type ModalState } from './EditItemModal'
@@ -32,11 +16,6 @@ interface PlannerBoardProps {
 
 interface DragPayload {
   dndId: string
-}
-
-interface DropPayload {
-  type: 'grid' | 'unscheduled' | 'sidebar'
-  dayId?: string
 }
 
 export function PlannerBoard({ planner }: PlannerBoardProps) {
@@ -68,60 +47,82 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
     setActiveDragTitle(title ?? null)
   }
 
+  /** Ids (dndId) + order de tudo que já está no destino, na ordem atual. */
+  function entriesFor(container: ContainerRef): { dndId: string; order: number }[] {
+    if (container.type === 'sidebar') return []
+    if (container.type === 'unassigned') {
+      return planner.agendaItems
+        .filter((it) => it.dayId === container.dayId && !it.period)
+        .map((it) => ({ dndId: agendaDndId(it.id), order: it.order }))
+    }
+    const agenda = planner.agendaItems
+      .filter((it) => it.dayId === container.dayId && it.period === container.period)
+      .map((it) => ({ dndId: agendaDndId(it.id), order: it.order }))
+    const backlog = planner.backlogItems
+      .filter((it) => it.allocation?.dayId === container.dayId && it.allocation?.period === container.period)
+      .map((it) => ({ dndId: backlogAllocDndId(it.id), order: it.allocation!.order }))
+    return [...agenda, ...backlog].sort((a, b) => a.order - b.order)
+  }
+
+  /** Resolve em qual container (período/sem período/sidebar) um id de item já está hoje. */
+  function containerOfItem(dndId: string): ContainerRef | null {
+    const { kind, id } = splitDndId(dndId)
+    if (kind === 'agenda') {
+      const item = planner.agendaItems.find((i) => i.id === id)
+      if (!item) return null
+      return item.period ? { type: 'period', dayId: item.dayId, period: item.period } : { type: 'unassigned', dayId: item.dayId }
+    }
+    const item = planner.backlogItems.find((i) => i.id === id)
+    if (!item) return null
+    return item.allocation ? { type: 'period', dayId: item.allocation.dayId, period: item.allocation.period } : { type: 'sidebar' }
+  }
+
+  function resolveTarget(overId: string): ContainerRef | null {
+    return parseContainerId(overId) ?? containerOfItem(overId)
+  }
+
+  function appendOrder(container: ContainerRef, excludeDndId?: string): number {
+    const entries = entriesFor(container).filter((e) => e.dndId !== excludeDndId)
+    return entries.length === 0 ? 0 : entries[entries.length - 1].order + 1
+  }
+
+  function computeOrder(entries: { dndId: string; order: number }[], activeDndId: string, overId: string): number {
+    const rest = entries.filter((e) => e.dndId !== activeDndId)
+    if (rest.length === 0) return 0
+    const overIsItem = parseContainerId(overId) === null
+    if (!overIsItem) return rest[rest.length - 1].order + 1
+    const idx = rest.findIndex((e) => e.dndId === overId)
+    if (idx === -1) return rest[rest.length - 1].order + 1
+    if (idx === 0) return rest[0].order - 1
+    return (rest[idx - 1].order + rest[idx].order) / 2
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     setActiveDragTitle(null)
-    const { active, over, activatorEvent } = event
-    if (!over) return
+    const { active, over } = event
+    if (!over || active.id === over.id) return
     const data = active.data.current as DragPayload | undefined
     if (!data) return
     const { kind, id } = splitDndId(data.dndId)
-    const overData = over.data.current as DropPayload | undefined
-    if (!overData) return
 
-    if (overData.type === 'grid' && overData.dayId) {
-      const dayId = overData.dayId
-      if (isPastDay(dayId)) return
+    const target = resolveTarget(String(over.id))
+    if (!target) return
 
-      // event.delta is scroll-adjusted, so activatorEvent.clientY + delta.y double-counts
-      // any scroll that happened during the drag. active.rect.current.translated is the
-      // dragged node's live (already scroll-corrected) position, so we recover the cursor's
-      // Y by adding back the fixed offset between the cursor and the node's top at pickup.
-      const initialTop = active.rect.current.initial?.top
-      const translatedTop = active.rect.current.translated?.top
-      if (initialTop == null || translatedTop == null) return
-      const clientY = 'clientY' in activatorEvent ? (activatorEvent as PointerEvent).clientY : initialTop
-      const grabOffsetY = clientY - initialTop
-      const pointerY = translatedTop + grabOffsetY
-      const relativeY = pointerY - over.rect.top
-      const rawMinutes = GRID_START_HOUR * 60 + (relativeY / HOUR_HEIGHT) * 60
-
-      if (kind === 'agenda') {
-        const item = planner.agendaItems.find((i) => i.id === id)
-        if (!item) return
-        const duration = item.duration ?? DEFAULT_DURATION
-        const start = minutesToTime(snapMinutes(clampStartMinutes(rawMinutes, duration)))
-        planner.updateAgendaItem(id, { dayId, start, duration })
-      } else {
-        const item = planner.backlogItems.find((i) => i.id === id)
-        if (!item) return
-        const duration = item.allocation?.duration ?? DEFAULT_DURATION
-        const start = minutesToTime(snapMinutes(clampStartMinutes(rawMinutes, duration)))
-        planner.allocate(id, dayId, start, duration)
-      }
+    if (target.type === 'sidebar') {
+      if (kind === 'backlog') planner.unallocate(id)
       return
     }
 
-    if (overData.type === 'unscheduled' && overData.dayId) {
-      if (kind === 'agenda') {
-        const dayId = overData.dayId
-        if (isPastDay(dayId)) return
-        planner.updateAgendaItem(id, { dayId, start: null })
-      }
-      return
-    }
+    if (isPastDay(target.dayId)) return
 
-    if (overData.type === 'sidebar' && kind === 'backlog') {
-      planner.unallocate(id)
+    const entries = entriesFor(target)
+    const order = computeOrder(entries, data.dndId, String(over.id))
+
+    if (kind === 'agenda') {
+      const period: PeriodId | null = target.type === 'period' ? target.period : null
+      planner.updateAgendaItem(id, { dayId: target.dayId, period, order })
+    } else if (target.type === 'period') {
+      planner.allocate(id, target.dayId, target.period, order)
     }
   }
 
@@ -167,13 +168,6 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
                 onToggleDone={planner.toggleDone}
                 onOpenAgenda={(item) => setModal({ type: 'agenda', item })}
                 onOpenBacklog={(item) => setModal({ type: 'backlog', item })}
-                onResizeAgenda={(id, duration) => planner.updateAgendaItem(id, { duration })}
-                onResizeBacklog={(id, duration) => {
-                  const item = planner.backlogItems.find((i) => i.id === id)
-                  if (item?.allocation) {
-                    planner.allocate(id, item.allocation.dayId, item.allocation.start, duration)
-                  }
-                }}
                 onAddAgenda={(dayId) => setModal({ type: 'agenda-new', dayId })}
               />
             ))}
@@ -202,14 +196,26 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
         state={modal}
         onClose={() => setModal(null)}
         onSaveAgenda={(id, dayId, data) => {
-          if (id) planner.updateAgendaItem(id, data)
-          else planner.addAgendaItem(dayId, data)
+          const container: ContainerRef = data.period
+            ? { type: 'period', dayId, period: data.period }
+            : { type: 'unassigned', dayId }
+          if (id) {
+            const existing = planner.agendaItems.find((i) => i.id === id)
+            const samePlace = existing && existing.dayId === dayId && existing.period === data.period
+            const order = samePlace ? existing.order : appendOrder(container, agendaDndId(id))
+            planner.updateAgendaItem(id, { ...data, dayId, order })
+          } else {
+            planner.addAgendaItem(dayId, { ...data, order: appendOrder(container) })
+          }
         }}
         onDeleteAgenda={planner.deleteAgendaItem}
         onSaveBacklog={(id, data) => planner.updateBacklogItem(id, data)}
         onDeleteBacklog={planner.deleteBacklogItem}
         onUnallocate={planner.unallocate}
-        onReallocate={planner.allocate}
+        onReallocate={(id, dayId, period) => {
+          const order = appendOrder({ type: 'period', dayId, period }, backlogAllocDndId(id))
+          planner.allocate(id, dayId, period, order)
+        }}
       />
     </DndContext>
   )

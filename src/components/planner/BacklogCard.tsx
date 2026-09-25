@@ -1,8 +1,10 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { formatDayShort } from '@/lib/days'
+import { Checkbox } from '@/components/Checkbox'
 import { ACCENT_STYLES, CATEGORY_ACCENT } from '@/lib/categoryStyles'
+import { formatDayShort } from '@/lib/days'
 import { backlogCardDndId } from '@/lib/dnd'
+import { PERIOD_LABEL } from '@/lib/periods'
 import type { BacklogItem } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -39,14 +41,7 @@ export function BacklogCard({ item, onToggleDone, onOpen }: BacklogCardProps) {
         isDragging && 'z-30 opacity-85 shadow-lifted',
       )}
     >
-      <input
-        type="checkbox"
-        checked={item.done}
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-        onChange={onToggleDone}
-        className="mt-0.5 size-3.5 shrink-0 accent-rust"
-      />
+      <Checkbox checked={item.done} onChange={onToggleDone} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <p className={cn('truncate text-sm leading-tight', styles.text, item.done && 'line-through')}>
           {item.title}
@@ -64,7 +59,7 @@ export function BacklogCard({ item, onToggleDone, onOpen }: BacklogCardProps) {
           <span className="font-mono text-[9px] text-ink-dim">{item.size}</span>
           {item.allocation && (
             <span className="font-mono text-[9px] text-ink-faint">
-              · {formatDayShort(item.allocation.dayId)} {item.allocation.start}
+              · {formatDayShort(item.allocation.dayId)} {PERIOD_LABEL[item.allocation.period]}
             </span>
           )}
         </div>

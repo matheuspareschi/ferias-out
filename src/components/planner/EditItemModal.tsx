@@ -2,7 +2,8 @@ import { Trash2, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { ACCENT_OPTIONS, ACCENT_STYLES } from '@/lib/categoryStyles'
 import { formatDayShort } from '@/lib/days'
-import type { AccentColor, AgendaItem, BacklogCategory, BacklogItem, BacklogSize } from '@/lib/types'
+import { PERIOD_LABEL, PERIOD_ORDER } from '@/lib/periods'
+import type { AccentColor, AgendaItem, BacklogCategory, BacklogItem, BacklogSize, PeriodId } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 export type ModalState =
@@ -17,13 +18,13 @@ interface EditItemModalProps {
   onSaveAgenda: (
     id: string | null,
     dayId: string,
-    data: { title: string; start: string | null; duration: number | null; color: AccentColor },
+    data: { title: string; period: PeriodId | null; timeNote?: string; color: AccentColor },
   ) => void
   onDeleteAgenda: (id: string) => void
   onSaveBacklog: (id: string, data: { title: string; category: BacklogCategory; size: BacklogSize }) => void
   onDeleteBacklog: (id: string) => void
   onUnallocate: (id: string) => void
-  onReallocate: (id: string, dayId: string, start: string, duration: number) => void
+  onReallocate: (id: string, dayId: string, period: PeriodId) => void
 }
 
 const inputClass =
@@ -76,6 +77,48 @@ export function EditItemModal({
   )
 }
 
+function PeriodPicker({
+  value,
+  onChange,
+  allowNone = true,
+}: {
+  value: PeriodId | null
+  onChange: (period: PeriodId | null) => void
+  allowNone?: boolean
+}) {
+  return (
+    <div className="flex gap-1.5">
+      {allowNone && (
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          className={cn(
+            'rounded-sm border px-2 py-1 text-xs',
+            value === null
+              ? 'border-ink bg-ink text-paper'
+              : 'border-line text-ink-dim hover:border-line-strong',
+          )}
+        >
+          sem período
+        </button>
+      )}
+      {PERIOD_ORDER.map((p) => (
+        <button
+          key={p}
+          type="button"
+          onClick={() => onChange(p)}
+          className={cn(
+            'flex-1 rounded-sm border px-2 py-1 text-xs capitalize',
+            value === p ? 'border-ink bg-ink text-paper' : 'border-line text-ink-dim hover:border-line-strong',
+          )}
+        >
+          {PERIOD_LABEL[p]}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function AgendaForm({
   item,
   dayId,
@@ -90,8 +133,8 @@ function AgendaForm({
   onClose: () => void
 }) {
   const [title, setTitle] = useState(item?.title ?? '')
-  const [start, setStart] = useState(item?.start ?? '')
-  const [duration, setDuration] = useState(item?.duration != null ? String(item.duration) : '')
+  const [period, setPeriod] = useState<PeriodId | null>(item?.period ?? null)
+  const [timeNote, setTimeNote] = useState(item?.timeNote ?? '')
   const [color, setColor] = useState<AccentColor>(item?.color ?? 'clay')
 
   function handleSubmit(e: FormEvent) {
@@ -99,8 +142,8 @@ function AgendaForm({
     if (!title.trim()) return
     onSave(item?.id ?? null, dayId, {
       title: title.trim(),
-      start: start || null,
-      duration: duration ? Number(duration) : null,
+      period,
+      timeNote: timeNote.trim() || undefined,
       color,
     })
     onClose()
@@ -110,7 +153,7 @@ function AgendaForm({
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h3 className="font-serif text-base font-semibold">
-          {item ? 'Editar compromisso' : 'Novo compromisso'}
+          {item ? 'Editar tarefa' : 'Nova tarefa'}
         </h3>
         <button type="button" onClick={onClose} className="text-ink-dim hover:text-ink" aria-label="Fechar">
           <X className="size-4" />
@@ -127,23 +170,19 @@ function AgendaForm({
           className={inputClass}
         />
       </label>
-      <div className="flex gap-2">
-        <label className={labelClass}>
-          Horário
-          <input type="time" value={start} onChange={(e) => setStart(e.target.value)} className={inputClass} />
-        </label>
-        <label className={labelClass}>
-          Duração (min)
-          <input
-            type="number"
-            min={0}
-            step={5}
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-            className={inputClass}
-          />
-        </label>
+      <div className="flex flex-col gap-1 text-xs text-ink-dim">
+        Período
+        <PeriodPicker value={period} onChange={setPeriod} />
       </div>
+      <label className="flex flex-col gap-1 text-xs text-ink-dim">
+        Observação de horário (opcional)
+        <input
+          value={timeNote}
+          onChange={(e) => setTimeNote(e.target.value)}
+          placeholder="ex.: 17:00 ou 9:00–11:00"
+          className={inputClass}
+        />
+      </label>
       <div className="flex flex-col gap-1 text-xs text-ink-dim">
         Cor
         <div className="flex gap-1.5">
@@ -206,15 +245,14 @@ function BacklogForm({
   const [title, setTitle] = useState(item.title)
   const [category, setCategory] = useState<BacklogCategory>(item.category)
   const [size, setSize] = useState<BacklogSize>(item.size)
-  const [start, setStart] = useState(item.allocation?.start ?? '')
-  const [duration, setDuration] = useState(item.allocation ? String(item.allocation.duration) : '')
+  const [period, setPeriod] = useState<PeriodId | null>(item.allocation?.period ?? null)
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
     onSave(item.id, { title: title.trim(), category, size })
-    if (item.allocation && start) {
-      onReallocate(item.id, item.allocation.dayId, start, duration ? Number(duration) : item.allocation.duration)
+    if (item.allocation && period && period !== item.allocation.period) {
+      onReallocate(item.id, item.allocation.dayId, period)
     }
     onClose()
   }
@@ -279,28 +317,7 @@ function BacklogForm({
               remover
             </button>
           </div>
-          <div className="flex gap-2">
-            <label className={labelClass}>
-              Horário
-              <input
-                type="time"
-                value={start}
-                onChange={(e) => setStart(e.target.value)}
-                className={inputClass}
-              />
-            </label>
-            <label className={labelClass}>
-              Duração (min)
-              <input
-                type="number"
-                min={15}
-                step={5}
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-                className={inputClass}
-              />
-            </label>
-          </div>
+          <PeriodPicker value={period} onChange={(p) => p && setPeriod(p)} allowNone={false} />
         </div>
       )}
       <div className="mt-1 flex items-center justify-between">

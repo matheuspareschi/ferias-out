@@ -2,6 +2,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { BookOpen, Flame, Footprints, PersonStanding, Search, type LucideIcon } from 'lucide-react'
 import { habitDndId } from '@/lib/dnd'
+import { PERIOD_LABEL } from '@/lib/periods'
 import type { AgendaItem, HabitId } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -66,7 +67,11 @@ function HabitButton({
     <button
       ref={setNodeRef}
       type="button"
-      title={item.start ? `${HABIT_LABEL[habit]} · ${item.start}` : `${HABIT_LABEL[habit]} — arraste para agendar`}
+      title={
+        item.period
+          ? `${HABIT_LABEL[habit]} · ${PERIOD_LABEL[item.period]}`
+          : `${HABIT_LABEL[habit]} — arraste para um período`
+      }
       aria-label={HABIT_LABEL[habit]}
       disabled={disabled}
       onClick={onToggle}
@@ -85,7 +90,7 @@ function HabitButton({
       )}
     >
       <Icon className="size-3.5" />
-      {item.start && !item.done && (
+      {item.period && !item.done && (
         <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-clay" aria-hidden />
       )}
     </button>
