@@ -5,6 +5,7 @@ const CATEGORY_OPTIONS: { value: DayCategoryId; label: string }[] = [
   { value: 'piedade', label: 'piedade' },
   { value: 'lazer', label: 'lazer' },
   { value: 'geral', label: 'atividades gerais' },
+  { value: 'estudo', label: 'estudo' },
   { value: 'livre', label: 'tempo livre' },
   { value: 'outro', label: 'outro' },
 ]
@@ -13,6 +14,7 @@ const CATEGORY_CLASS: Record<DayCategoryId, string> = {
   piedade: 'border-gold-dim bg-gold-soft text-gold',
   lazer: 'border-olive-dim bg-olive-soft text-olive',
   geral: 'border-clay bg-clay-soft text-clay',
+  estudo: 'border-slate-dim bg-slate-soft text-slate',
   livre: 'border-rust-dim bg-rust-soft text-rust',
   outro: 'border-line-strong bg-paper-raised text-ink-dim',
 }

@@ -146,12 +146,17 @@ function seedState(): PlannerState {
   }
 }
 
+/** Ao abrir o app, sempre parte do dia atual — não herda o último dia navegado. */
+function withTodayAnchor(state: PlannerState): PlannerState {
+  return { ...state, anchorDayId: defaultAnchorDayId() }
+}
+
 function loadState(): PlannerState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const normalized = normalizeState(JSON.parse(raw))
-      if (normalized) return normalized
+      if (normalized) return withTodayAnchor(normalized)
     }
   } catch {
     // localStorage indisponível ou dados corrompidos — cai para o seed
@@ -222,7 +227,7 @@ export function usePlanner() {
         const remote = data?.data ? normalizeState(data.data as Partial<PlannerState>) : null
         if (remote) {
           isRemoteUpdate.current = true
-          setState(remote)
+          setState(withTodayAnchor(remote))
           setSyncStatus('synced')
         } else {
           // primeira vez usando o Supabase: sobe o estado local atual como ponto de partida
@@ -241,7 +246,9 @@ export function usePlanner() {
           const remote = incoming?.data ? normalizeState(incoming.data as Partial<PlannerState>) : null
           if (remote) {
             isRemoteUpdate.current = true
-            setState(remote)
+            // Mantém o dia que a pessoa está vendo — não pula pro dia que estava
+            // aberto no outro aparelho que originou a mudança.
+            setState((prev) => ({ ...remote, anchorDayId: prev.anchorDayId }))
             setSyncStatus('synced')
           }
         },

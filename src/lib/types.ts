@@ -5,7 +5,7 @@ export interface Day {
 
 export type HabitId = 'devocional' | 'alongamento' | 'leitura' | 'exercicio' | 'revisao'
 
-export type DayCategoryId = 'piedade' | 'lazer' | 'geral' | 'livre' | 'outro'
+export type DayCategoryId = 'piedade' | 'lazer' | 'geral' | 'estudo' | 'livre' | 'outro'
 
 /** Paleta de destaque usada nos blocos — cor padrão do compromisso ou escolha do usuário. */
 export type AccentColor = 'clay' | 'rust' | 'olive' | 'gold' | 'ink'

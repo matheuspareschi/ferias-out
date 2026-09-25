@@ -155,22 +155,26 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
             </button>
           </div>
           <div className="grid flex-1 auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:overflow-hidden">
-            {windowDays.map((day) => (
-              <DayColumn
-                key={day.id}
-                dayId={day.id}
-                weekday={day.weekday}
-                isAnchor={day.id === planner.anchorDayId}
-                agendaItems={planner.agendaItems.filter((i) => i.dayId === day.id)}
-                allocatedBacklogItems={planner.backlogItems.filter((i) => i.allocation?.dayId === day.id)}
-                category={planner.dayCategories[day.id] ?? null}
-                onSetCategory={planner.setDayCategory}
-                onToggleDone={planner.toggleDone}
-                onOpenAgenda={(item) => setModal({ type: 'agenda', item })}
-                onOpenBacklog={(item) => setModal({ type: 'backlog', item })}
-                onAddAgenda={(dayId) => setModal({ type: 'agenda-new', dayId })}
-              />
-            ))}
+            {windowDays.map((day) => {
+              const isAnchor = day.id === planner.anchorDayId
+              return (
+                <div key={day.id} className={isAnchor ? 'contents' : 'hidden sm:contents'}>
+                  <DayColumn
+                    dayId={day.id}
+                    weekday={day.weekday}
+                    isAnchor={isAnchor}
+                    agendaItems={planner.agendaItems.filter((i) => i.dayId === day.id)}
+                    allocatedBacklogItems={planner.backlogItems.filter((i) => i.allocation?.dayId === day.id)}
+                    category={planner.dayCategories[day.id] ?? null}
+                    onSetCategory={planner.setDayCategory}
+                    onToggleDone={planner.toggleDone}
+                    onOpenAgenda={(item) => setModal({ type: 'agenda', item })}
+                    onOpenBacklog={(item) => setModal({ type: 'backlog', item })}
+                    onAddAgenda={(dayId) => setModal({ type: 'agenda-new', dayId })}
+                  />
+                </div>
+              )
+            })}
           </div>
         </div>
 
