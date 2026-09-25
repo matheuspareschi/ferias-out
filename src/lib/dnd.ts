@@ -1,4 +1,40 @@
+import { CSS } from '@dnd-kit/utilities'
+import type { Transform } from '@dnd-kit/utilities'
 import type { PeriodId } from './types'
+
+const POP_SCALE = 1.05
+const POP_TRANSITION = 'transform 150ms ease, box-shadow 150ms ease'
+
+/**
+ * Estilo de transform/transition de um item `useSortable` — dá um leve salto de
+ * escala assim que o toque prolongado ativa o arraste (feedback de "agora dá
+ * pra mover"), sem interferir na animação de encaixe do dnd-kit fora disso.
+ */
+export function sortableDragStyle(
+  transform: Transform | null,
+  transition: string | undefined,
+  isDragging: boolean,
+): { transform: string | undefined; transition: string | undefined } {
+  if (!isDragging) return { transform: CSS.Transform.toString(transform), transition }
+  const base = transform ?? { x: 0, y: 0, scaleX: 1, scaleY: 1 }
+  return {
+    transform: CSS.Transform.toString({ ...base, scaleX: base.scaleX * POP_SCALE, scaleY: base.scaleY * POP_SCALE }),
+    transition: POP_TRANSITION,
+  }
+}
+
+/** Mesmo salto de ativação, para um item `useDraggable` (transform só de translação). */
+export function draggableDragStyle(
+  transform: Transform | null,
+  isDragging: boolean,
+): { transform: string | undefined; transition: string | undefined } {
+  if (!isDragging) return { transform: transform ? CSS.Translate.toString(transform) : undefined, transition: undefined }
+  const base = transform ?? { x: 0, y: 0, scaleX: 1, scaleY: 1 }
+  return {
+    transform: `${CSS.Translate.toString(base)} scale(${POP_SCALE})`,
+    transition: POP_TRANSITION,
+  }
+}
 
 /**
  * Esquema de ids de arraste (dnd-kit). Cada draggable montado precisa de um id

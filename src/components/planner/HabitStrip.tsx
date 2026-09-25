@@ -1,7 +1,6 @@
 import { useDraggable } from '@dnd-kit/core'
-import { CSS } from '@dnd-kit/utilities'
 import { BookOpen, Flame, Footprints, PersonStanding, Search, type LucideIcon } from 'lucide-react'
-import { habitDndId } from '@/lib/dnd'
+import { draggableDragStyle, habitDndId } from '@/lib/dnd'
 import { PERIOD_LABEL } from '@/lib/periods'
 import type { AgendaItem, HabitId } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -75,12 +74,12 @@ function HabitButton({
       aria-label={HABIT_LABEL[habit]}
       disabled={disabled}
       onClick={onToggle}
-      style={{ transform: transform ? CSS.Translate.toString(transform) : undefined }}
+      style={draggableDragStyle(transform, isDragging)}
       {...listeners}
       {...attributes}
       aria-pressed={item.done}
       className={cn(
-        'relative flex size-7 select-none touch-none items-center justify-center rounded-sm border transition-colors',
+        'relative flex size-7 select-none touch-manipulation items-center justify-center rounded-sm border transition-colors',
         !disabled && 'cursor-grab active:cursor-grabbing',
         item.done
           ? 'border-gold-dim bg-gold-soft text-gold'

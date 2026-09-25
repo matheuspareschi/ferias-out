@@ -1,9 +1,8 @@
 import { useDraggable } from '@dnd-kit/core'
-import { CSS } from '@dnd-kit/utilities'
 import { Checkbox } from '@/components/Checkbox'
 import { ACCENT_STYLES, CATEGORY_ACCENT } from '@/lib/categoryStyles'
 import { formatDayShort } from '@/lib/days'
-import { backlogCardDndId } from '@/lib/dnd'
+import { backlogCardDndId, draggableDragStyle } from '@/lib/dnd'
 import { PERIOD_LABEL } from '@/lib/periods'
 import type { BacklogItem } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -25,7 +24,7 @@ export function BacklogCard({ item, onToggleDone, onOpen }: BacklogCardProps) {
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: transform ? CSS.Translate.toString(transform) : undefined }}
+      style={draggableDragStyle(transform, isDragging)}
       {...listeners}
       {...attributes}
       onClick={(e) => {
@@ -33,7 +32,7 @@ export function BacklogCard({ item, onToggleDone, onOpen }: BacklogCardProps) {
         onOpen()
       }}
       className={cn(
-        'flex select-none touch-none cursor-grab items-start gap-2 rounded-sm border border-l-4 px-2.5 py-2 shadow-card active:cursor-grabbing',
+        'flex select-none touch-manipulation cursor-grab items-start gap-2 rounded-sm border border-l-4 px-2.5 py-2 shadow-card active:cursor-grabbing',
         styles.bg,
         styles.border,
         styles.stripe,

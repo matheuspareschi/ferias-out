@@ -1,4 +1,4 @@
-import { DndContext, DragOverlay, PointerSensor, pointerWithin, useSensor, useSensors } from '@dnd-kit/core'
+import { DndContext, DragOverlay, MouseSensor, TouchSensor, pointerWithin, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
@@ -22,7 +22,13 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
   const [modal, setModal] = useState<ModalState>(null)
   const [activeDragTitle, setActiveDragTitle] = useState<string | null>(null)
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
+  const sensors = useSensors(
+    // Mouse (desktop): arraste começa assim que o cursor se move um pouco, como antes.
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    // Toque (mobile): precisa segurar 3s parado pra ativar — evita que um toque
+    // qualquer (rolar a tela, tocar no checkbox) já mude o cartão de lugar.
+    useSensor(TouchSensor, { activationConstraint: { delay: 3000, tolerance: 8 } }),
+  )
 
   const anchorIdx = dayIndex(planner.anchorDayId)
   const windowDays = [DAYS[anchorIdx - 1], DAYS[anchorIdx], DAYS[anchorIdx + 1]].filter(

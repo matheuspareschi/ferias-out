@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import { Checkbox } from '@/components/Checkbox'
 import { ACCENT_STYLES } from '@/lib/categoryStyles'
+import { sortableDragStyle } from '@/lib/dnd'
 import type { AccentColor } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -35,11 +35,7 @@ export function TaskCard({
     data: { dndId },
   })
   const styles = ACCENT_STYLES[kind]
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  }
+  const style = sortableDragStyle(transform, transition, isDragging)
 
   const meta = [timeNote, badge].filter(Boolean).join(' · ')
 
@@ -54,7 +50,7 @@ export function TaskCard({
         onOpen()
       }}
       className={cn(
-        'flex h-14 shrink-0 select-none touch-none items-center gap-2 rounded-sm border border-l-4 px-2.5 shadow-card',
+        'flex h-14 shrink-0 select-none touch-manipulation items-center gap-2 rounded-sm border border-l-4 px-2.5 shadow-card',
         !disabled && 'cursor-grab active:cursor-grabbing',
         styles.bg,
         styles.border,

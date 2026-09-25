@@ -1,8 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import { Checkbox } from '@/components/Checkbox'
 import { ACCENT_STYLES } from '@/lib/categoryStyles'
-import { agendaDndId } from '@/lib/dnd'
+import { agendaDndId, sortableDragStyle } from '@/lib/dnd'
 import type { AgendaItem } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -25,7 +24,7 @@ export function UnscheduledPill({ item, disabled, onToggleDone, onOpen }: Unsche
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={sortableDragStyle(transform, transition, isDragging)}
       {...listeners}
       {...attributes}
       onClick={(e) => {
@@ -33,7 +32,7 @@ export function UnscheduledPill({ item, disabled, onToggleDone, onOpen }: Unsche
         onOpen()
       }}
       className={cn(
-        'flex select-none touch-none items-center gap-1 rounded-sm border border-l-[3px] px-2 py-0.5 text-[10px]',
+        'flex select-none touch-manipulation items-center gap-1 rounded-sm border border-l-[3px] px-2 py-0.5 text-[10px]',
         styles.bg,
         styles.border,
         styles.stripe,
