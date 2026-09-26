@@ -135,6 +135,31 @@ body {
   height: 10px;
   width: 10px;
 }
+
+/*
+ * Preenchimento de "carregando" enquanto o toque prolongado (3s) está
+ * pendente num card — sem isso a pessoa não sabe se segurar está
+ * funcionando e solta ou mexe cedo demais, cancelando o arraste.
+ */
+@keyframes dnd-pending-fill {
+  from {
+    background-size: 0% 100%;
+  }
+  to {
+    background-size: 100% 100%;
+  }
+}
+
+.dnd-pending {
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--color-ink) 24%, transparent),
+    color-mix(in srgb, var(--color-ink) 24%, transparent)
+  );
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
+  animation: dnd-pending-fill 3s linear forwards;
+}
 ::-webkit-scrollbar-track {
   background: transparent;
 }

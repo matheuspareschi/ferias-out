@@ -2,7 +2,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { Checkbox } from '@/components/Checkbox'
 import { ACCENT_STYLES, CATEGORY_ACCENT } from '@/lib/categoryStyles'
 import { formatDayShort } from '@/lib/days'
-import { backlogCardDndId, draggableDragStyle } from '@/lib/dnd'
+import { backlogCardDndId, draggableDragStyle, usePendingDnd } from '@/lib/dnd'
 import { PERIOD_LABEL } from '@/lib/periods'
 import type { BacklogItem } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -20,6 +20,7 @@ export function BacklogCard({ item, onToggleDone, onOpen }: BacklogCardProps) {
     data: { dndId },
   })
   const styles = ACCENT_STYLES[CATEGORY_ACCENT[item.category]]
+  const isPending = usePendingDnd(dndId)
 
   return (
     <div
@@ -38,6 +39,7 @@ export function BacklogCard({ item, onToggleDone, onOpen }: BacklogCardProps) {
         styles.stripe,
         item.done && 'opacity-55',
         isDragging && 'z-30 opacity-85 shadow-lifted',
+        isPending && 'dnd-pending',
       )}
     >
       <Checkbox checked={item.done} onChange={onToggleDone} className="mt-0.5" />

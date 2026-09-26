@@ -1,6 +1,18 @@
 import { CSS } from '@dnd-kit/utilities'
 import type { Transform } from '@dnd-kit/utilities'
+import { createContext, useContext } from 'react'
 import type { PeriodId } from './types'
+
+/**
+ * Id do item em "espera de ativação" (segurando, ainda dentro dos 3s do toque
+ * prolongado) — usado só pra pintar o preenchimento de "carregando" no card
+ * certo enquanto a pessoa segura. `null` quando nada está pendente.
+ */
+export const PendingDndContext = createContext<string | null>(null)
+
+export function usePendingDnd(dndId: string): boolean {
+  return useContext(PendingDndContext) === dndId
+}
 
 const POP_SCALE = 1.05
 const POP_TRANSITION = 'transform 150ms ease, box-shadow 150ms ease'

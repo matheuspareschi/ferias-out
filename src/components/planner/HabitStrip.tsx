@@ -1,6 +1,6 @@
 import { useDraggable } from '@dnd-kit/core'
 import { BookOpen, Flame, Footprints, PersonStanding, Search, type LucideIcon } from 'lucide-react'
-import { draggableDragStyle, habitDndId } from '@/lib/dnd'
+import { draggableDragStyle, habitDndId, usePendingDnd } from '@/lib/dnd'
 import { PERIOD_LABEL } from '@/lib/periods'
 import type { AgendaItem, HabitId } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -61,6 +61,7 @@ function HabitButton({
     disabled,
     data: { dndId },
   })
+  const isPending = usePendingDnd(dndId)
 
   return (
     <button
@@ -86,6 +87,7 @@ function HabitButton({
           : 'border-line text-ink-faint hover:border-line-strong hover:text-ink-dim',
         disabled && 'pointer-events-none opacity-50',
         isDragging && 'z-30 opacity-85 shadow-lifted',
+        isPending && 'dnd-pending',
       )}
     >
       <Icon className="size-3.5" />

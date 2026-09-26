@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { Checkbox } from '@/components/Checkbox'
 import { ACCENT_STYLES } from '@/lib/categoryStyles'
-import { agendaDndId, sortableDragStyle } from '@/lib/dnd'
+import { agendaDndId, sortableDragStyle, usePendingDnd } from '@/lib/dnd'
 import type { AgendaItem } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -20,6 +20,7 @@ export function UnscheduledPill({ item, disabled, onToggleDone, onOpen }: Unsche
     data: { dndId },
   })
   const styles = ACCENT_STYLES[item.color ?? 'clay']
+  const isPending = usePendingDnd(dndId)
 
   return (
     <div
@@ -39,6 +40,7 @@ export function UnscheduledPill({ item, disabled, onToggleDone, onOpen }: Unsche
         !disabled && 'cursor-grab active:cursor-grabbing',
         item.done && 'opacity-55 line-through',
         isDragging && 'z-30 opacity-85 shadow-lifted',
+        isPending && 'dnd-pending',
       )}
     >
       <Checkbox checked={item.done} onChange={onToggleDone} size="sm" />

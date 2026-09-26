@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { Checkbox } from '@/components/Checkbox'
 import { ACCENT_STYLES } from '@/lib/categoryStyles'
-import { sortableDragStyle } from '@/lib/dnd'
+import { sortableDragStyle, usePendingDnd } from '@/lib/dnd'
 import type { AccentColor } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -36,6 +36,7 @@ export function TaskCard({
   })
   const styles = ACCENT_STYLES[kind]
   const style = sortableDragStyle(transform, transition, isDragging)
+  const isPending = usePendingDnd(dndId)
 
   const meta = [timeNote, badge].filter(Boolean).join(' · ')
 
@@ -57,6 +58,7 @@ export function TaskCard({
         styles.stripe,
         done && 'opacity-55',
         isDragging && 'z-30 opacity-70 shadow-lifted',
+        isPending && 'dnd-pending',
       )}
     >
       <Checkbox checked={done} onChange={onToggleDone} />

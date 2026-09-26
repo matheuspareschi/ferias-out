@@ -1,10 +1,17 @@
 import { DndContext, DragOverlay, MouseSensor, TouchSensor, pointerWithin, useSensor, useSensors } from '@dnd-kit/core'
-import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
+import type { DragEndEvent, DragPendingEvent, DragStartEvent } from '@dnd-kit/core'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
 import { DAYS, dayIndex, isPastDay } from '@/lib/days'
-import { agendaDndId, backlogAllocDndId, type ContainerRef, parseContainerId, splitDndId } from '@/lib/dnd'
+import {
+  agendaDndId,
+  backlogAllocDndId,
+  type ContainerRef,
+  parseContainerId,
+  PendingDndContext,
+  splitDndId,
+} from '@/lib/dnd'
 import type { BacklogCategory, BacklogSize, PeriodId } from '@/lib/types'
 import { BacklogSidebar } from './BacklogSidebar'
 import { DayColumn } from './DayColumn'
@@ -21,14 +28,24 @@ interface DragPayload {
 export function PlannerBoard({ planner }: PlannerBoardProps) {
   const [modal, setModal] = useState<ModalState>(null)
   const [activeDragTitle, setActiveDragTitle] = useState<string | null>(null)
+  const [pendingDndId, setPendingDndId] = useState<string | null>(null)
 
   const sensors = useSensors(
     // Mouse (desktop): arraste começa assim que o cursor se move um pouco, como antes.
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     // Toque (mobile): precisa segurar 3s parado pra ativar — evita que um toque
-    // qualquer (rolar a tela, tocar no checkbox) já mude o cartão de lugar.
-    useSensor(TouchSensor, { activationConstraint: { delay: 3000, tolerance: 8 } }),
+    // qualquer (rolar a tela, tocar no checkbox) já mude o cartão de lugar. A
+    // tolerância é generosa porque segurar o dedo perfeitamente parado por 3s
+    // reais não é realista — um pouco de tremor não pode cancelar o arraste.
+    useSensor(TouchSensor, { activationConstraint: { delay: 3000, tolerance: 20 } }),
   )
+
+  function handleDragPending(event: DragPendingEvent) {
+    setPendingDndId(String(event.id))
+  }
+  function clearPending() {
+    setPendingDndId(null)
+  }
 
   const anchorIdx = dayIndex(planner.anchorDayId)
   const windowDays = [DAYS[anchorIdx - 1], DAYS[anchorIdx], DAYS[anchorIdx + 1]].filter(
@@ -43,6 +60,7 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
   }
 
   function handleDragStart(event: DragStartEvent) {
+    setPendingDndId(null)
     const data = event.active.data.current as DragPayload | undefined
     if (!data) return
     const { kind, id } = splitDndId(data.dndId)
@@ -105,6 +123,7 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
 
   function handleDragEnd(event: DragEndEvent) {
     setActiveDragTitle(null)
+    setPendingDndId(null)
     const { active, over } = event
     if (!over || active.id === over.id) return
     const data = active.data.current as DragPayload | undefined
@@ -136,10 +155,16 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
     <DndContext
       sensors={sensors}
       collisionDetection={pointerWithin}
+      onDragPending={handleDragPending}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => setActiveDragTitle(null)}
+      onDragAbort={clearPending}
+      onDragCancel={() => {
+        setActiveDragTitle(null)
+        setPendingDndId(null)
+      }}
     >
+      <PendingDndContext.Provider value={pendingDndId}>
       <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:overflow-hidden">
         <div className="flex flex-1 flex-col gap-2 lg:overflow-hidden">
           <div className="flex items-center justify-between px-1">
@@ -193,6 +218,7 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
           }
         />
       </div>
+      </PendingDndContext.Provider>
 
       <DragOverlay>
         {activeDragTitle && (
