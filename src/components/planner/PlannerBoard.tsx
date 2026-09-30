@@ -3,7 +3,7 @@ import type { DragEndEvent, DragPendingEvent, DragStartEvent } from '@dnd-kit/co
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
-import { DAYS, dayIndex, isPastDay } from '@/lib/days'
+import { DAYS, dayIndex } from '@/lib/days'
 import {
   agendaDndId,
   backlogAllocDndId,
@@ -137,8 +137,6 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
       if (kind === 'backlog') planner.unallocate(id)
       return
     }
-
-    if (isPastDay(target.dayId)) return
 
     const entries = entriesFor(target)
     const order = computeOrder(entries, data.dndId, String(over.id))
