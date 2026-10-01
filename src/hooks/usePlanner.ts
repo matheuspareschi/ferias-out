@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_CONTEXT_ID, DEFAULT_CONTEXTS } from '@/lib/contexts'
 import { defaultAnchorDayId } from '@/lib/days'
+import { DEFAULT_DISCIPLINES } from '@/lib/disciplines'
+import { syncUnitReviews } from '@/lib/facultyReviews'
 import { CURRENT_SCHEMA_VERSION, needsMigration, normalizeState, type PlannerState } from '@/lib/migrations'
 import { buildSeedItems } from '@/lib/seed'
 import { SYNC_ENABLED, supabase } from '@/lib/supabaseClient'
-import type { Context, DayCategoryId, HabitId, Item } from '@/lib/types'
+import type { Context, DayCategoryId, HabitId, Item, ItemSize, LiveClassStatus, Unit } from '@/lib/types'
 
 const STORAGE_KEY = 'ferias-planner:v1'
 const BACKUP_KEY = 'ferias-planner:backup:pre-migration'
@@ -78,8 +80,12 @@ function seedState(): PlannerState {
     contexts: DEFAULT_CONTEXTS,
     dayMeta: {},
     anchorDayId: defaultAnchorDayId(),
+    disciplines: DEFAULT_DISCIPLINES,
+    units: [],
+    facultyNotes: { general: '', byDiscipline: {} },
   }
 }
+
 
 /** Ao abrir o app, sempre parte do dia atual — não herda o último dia navegado. */
 function withTodayAnchor(state: PlannerState): PlannerState {
@@ -283,6 +289,10 @@ export function usePlanner() {
         items = items.map((it) => (it.id === item.parentId ? { ...it, done: allDone } : it))
       }
 
+      if (item.unitRole === 'aula' && item.unitId) {
+        items = syncUnitReviews(items, s.units, s.disciplines, item.unitId, nextDone)
+      }
+
       return { ...s, items }
     })
   }, [])
@@ -347,6 +357,127 @@ export function usePlanner() {
     })
   }, [])
 
+  const addDiscipline = useCallback((sigla: string, name: string): string => {
+    const trimmedSigla = sigla.trim().toUpperCase()
+    const trimmedName = name.trim()
+    const id = slugify(trimmedSigla) || newId('disciplina')
+    setState((s) =>
+      s.disciplines.some((d) => d.id === id)
+        ? s
+        : { ...s, disciplines: [...s.disciplines, { id, sigla: trimmedSigla, name: trimmedName }] },
+    )
+    return id
+  }, [])
+
+  /** Cria a Unidade e, junto, o Item de "aula" ligado a ela (3.1 — alimenta backlog/dias como qualquer tarefa). */
+  const addUnit = useCallback((disciplineId: string, number: number, size: ItemSize, pages?: number): string => {
+    const unitId = newId('unidade')
+    setState((s) => {
+      const discipline = s.disciplines.find((d) => d.id === disciplineId)
+      const sigla = `${discipline?.sigla ?? 'UN'}${number}`
+      const aulaItem: Item = {
+        id: newId('aula'),
+        type: 'task',
+        title: `[${sigla}] Aula`,
+        context: 'faculdade',
+        size,
+        order: 0,
+        done: false,
+        unitId,
+        unitRole: 'aula',
+      }
+      return {
+        ...s,
+        units: [...s.units, { id: unitId, disciplineId, number, size, pages }],
+        items: [...s.items, aulaItem],
+      }
+    })
+    return unitId
+  }, [])
+
+  /** Edita a Unidade; número/tamanho novos também atualizam o título/tamanho da aula e das revisões já criadas. */
+  const updateUnit = useCallback((id: string, patch: Partial<Pick<Unit, 'number' | 'size' | 'pages'>>) => {
+    setState((s) => {
+      const unit = s.units.find((u) => u.id === id)
+      if (!unit) return s
+      const nextUnit = { ...unit, ...patch }
+      const discipline = s.disciplines.find((d) => d.id === nextUnit.disciplineId)
+      const sigla = `${discipline?.sigla ?? 'UN'}${nextUnit.number}`
+      const items = s.items.map((it) => {
+        if (it.unitId !== id) return it
+        if (it.unitRole === 'aula') return { ...it, title: `[${sigla}] Aula`, size: nextUnit.size }
+        if (it.unitRole === 'revisao') return { ...it, title: `[${sigla}] Revisão ${it.reviewIndex}/3` }
+        return it
+      })
+      return { ...s, units: s.units.map((u) => (u.id === id ? nextUnit : u)), items }
+    })
+  }, [])
+
+  /** Apaga a Unidade e todos os itens ligados a ela (aula + revisões), feitos ou não. */
+  const deleteUnit = useCallback((id: string) => {
+    setState((s) => ({
+      ...s,
+      units: s.units.filter((u) => u.id !== id),
+      items: s.items.filter((it) => it.unitId !== id),
+    }))
+  }, [])
+
+  const addDelivery = useCallback((disciplineId: string, title: string, dayId: string) => {
+    setState((s) => {
+      const discipline = s.disciplines.find((d) => d.id === disciplineId)
+      const label = title.trim()
+      const item: Item = {
+        id: newId('entrega'),
+        type: 'task',
+        title: discipline ? `[${discipline.sigla}] ${label}` : label,
+        context: 'faculdade',
+        dayId,
+        period: null,
+        order: 0,
+        done: false,
+        isDelivery: true,
+        disciplineId,
+      }
+      return { ...s, items: [...s.items, item] }
+    })
+  }, [])
+
+  const addLiveClass = useCallback((disciplineId: string, title: string, dayId: string, timeNote?: string) => {
+    setState((s) => {
+      const discipline = s.disciplines.find((d) => d.id === disciplineId)
+      const label = title.trim()
+      const item: Item = {
+        id: newId('aulavivo'),
+        type: 'event',
+        title: discipline ? `[${discipline.sigla}] ${label}` : label,
+        context: 'faculdade',
+        dayId,
+        period: null,
+        order: 0,
+        timeNote,
+        done: false,
+        disciplineId,
+        liveClassStatus: 'vou',
+      }
+      return { ...s, items: [...s.items, item] }
+    })
+  }, [])
+
+  const setLiveClassStatus = useCallback((id: string, status: LiveClassStatus) => {
+    setState((s) => ({ ...s, items: s.items.map((it) => (it.id === id ? { ...it, liveClassStatus: status } : it)) }))
+  }, [])
+
+  /** `disciplineId: null` grava a nota geral da Faculdade; com id, grava a nota daquela disciplina. */
+  const setFacultyNote = useCallback((disciplineId: string | null, text: string) => {
+    setState((s) => ({
+      ...s,
+      facultyNotes:
+        disciplineId === null
+          ? { ...s.facultyNotes, general: text }
+          : { ...s.facultyNotes, byDiscipline: { ...s.facultyNotes.byDiscipline, [disciplineId]: text } },
+    }))
+  }, [])
+
   const importState = useCallback((json: string): boolean => {
     try {
       const normalized = normalizeState(JSON.parse(json))
@@ -363,6 +494,9 @@ export function usePlanner() {
     contexts: state.contexts,
     dayMeta: state.dayMeta,
     anchorDayId: state.anchorDayId,
+    disciplines: state.disciplines,
+    units: state.units,
+    facultyNotes: state.facultyNotes,
     syncStatus,
     addItem,
     updateItem,
@@ -374,6 +508,14 @@ export function usePlanner() {
     addContext,
     renameContext,
     deleteContext,
+    addDiscipline,
+    addUnit,
+    updateUnit,
+    deleteUnit,
+    addDelivery,
+    addLiveClass,
+    setLiveClassStatus,
+    setFacultyNote,
     /** Estado completo, pronto pra `JSON.stringify` num botão de exportar. */
     exportState: () => state,
     importState,
