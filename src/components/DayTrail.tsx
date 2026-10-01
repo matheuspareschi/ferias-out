@@ -1,4 +1,5 @@
-import { DAYS, dayLabel, formatDayShort, isPastDay, todayId } from '@/lib/days'
+import { useEffect, useRef } from 'react'
+import { daysAround, dayLabel, formatDayShort, isPastDay, todayId } from '@/lib/days'
 import { cn } from '@/lib/utils'
 
 interface DayTrailProps {
@@ -6,15 +7,25 @@ interface DayTrailProps {
   onSelect: (dayId: string) => void
 }
 
+/** Quantos dias mostrar de cada lado da âncora — calendário sem fim, então a
+ * trilha é sempre uma janela centrada nela, não a lista inteira. */
+const TRAIL_RADIUS = 10
+
 export function DayTrail({ anchorDayId, onSelect }: DayTrailProps) {
   const today = todayId()
+  const days = daysAround(anchorDayId, TRAIL_RADIUS, TRAIL_RADIUS)
+  const anchorRef = useRef<HTMLButtonElement>(null)
+
+  // Garante que o dia âncora fique visível (ideal: centralizado) sempre que
+  // ele mudar — sem isso, ao navegar perto da borda da janela renderizada a
+  // pessoa perderia a referência visual de qual dia está selecionado.
+  useEffect(() => {
+    anchorRef.current?.scrollIntoView({ inline: 'center', block: 'nearest' })
+  }, [anchorDayId])
 
   return (
-    <nav
-      aria-label="Trilha dos 19 dias da viagem"
-      className="flex gap-1.5 overflow-x-auto px-1 py-1 -mx-1"
-    >
-      {DAYS.map((day) => {
+    <nav aria-label="Trilha de dias" className="flex gap-1.5 overflow-x-auto px-1 py-1 -mx-1">
+      {days.map((day) => {
         const isAnchor = day.id === anchorDayId
         const past = isPastDay(day.id, today)
         const isToday = day.id === today
@@ -23,6 +34,7 @@ export function DayTrail({ anchorDayId, onSelect }: DayTrailProps) {
         return (
           <button
             key={day.id}
+            ref={isAnchor ? anchorRef : undefined}
             type="button"
             onClick={() => onSelect(day.id)}
             aria-current={isAnchor ? 'date' : undefined}

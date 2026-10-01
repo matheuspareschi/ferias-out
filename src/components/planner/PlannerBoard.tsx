@@ -3,7 +3,8 @@ import type { DragEndEvent, DragPendingEvent, DragStartEvent } from '@dnd-kit/co
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
-import { DAYS, dayIndex } from '@/lib/days'
+import { addDays } from '@/lib/dates'
+import { daysAround } from '@/lib/days'
 import {
   agendaDndId,
   backlogAllocDndId,
@@ -47,16 +48,15 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
     setPendingDndId(null)
   }
 
-  const anchorIdx = dayIndex(planner.anchorDayId)
-  const windowDays = [DAYS[anchorIdx - 1], DAYS[anchorIdx], DAYS[anchorIdx + 1]].filter(
-    (d): d is (typeof DAYS)[number] => Boolean(d),
-  )
+  // Calendário sem fim: sempre 3 dias (ontem/hoje/amanhã em relação à âncora),
+  // sem limite de início ou fim pra nenhum dos lados.
+  const windowDays = daysAround(planner.anchorDayId, 1, 1)
 
   function goPrev() {
-    if (anchorIdx > 0) planner.setAnchorDay(DAYS[anchorIdx - 1].id)
+    planner.setAnchorDay(addDays(planner.anchorDayId, -1))
   }
   function goNext() {
-    if (anchorIdx < DAYS.length - 1) planner.setAnchorDay(DAYS[anchorIdx + 1].id)
+    planner.setAnchorDay(addDays(planner.anchorDayId, 1))
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -169,16 +169,14 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
             <button
               type="button"
               onClick={goPrev}
-              disabled={anchorIdx <= 0}
-              className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+              className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
             >
               <ChevronLeft className="size-3.5" /> anterior
             </button>
             <button
               type="button"
               onClick={goNext}
-              disabled={anchorIdx >= DAYS.length - 1}
-              className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+              className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
             >
               seguinte <ChevronRight className="size-3.5" />
             </button>
