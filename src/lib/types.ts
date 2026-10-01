@@ -62,6 +62,46 @@ export interface Item {
    * a lista de filhas — elas são encontradas filtrando por `parentId`.
    */
   parentId?: string
+  /** Liga o item a uma Unidade da Faculdade — só em itens de aula/revisão. */
+  unitId?: string
+  /** Papel do item dentro da Unidade (ver `unitId`). */
+  unitRole?: 'aula' | 'revisao'
+  /** Só em revisões: qual das 3 (1, 2 ou 3) — usado pra não duplicar. */
+  reviewIndex?: 1 | 2 | 3
+  /** Entrega da Faculdade — mostra ★ em vez do símbolo normal de tipo. */
+  isDelivery?: boolean
+  /** Disciplina direta — entregas e aulas ao vivo, que não passam por Unidade. */
+  disciplineId?: string
+  /** Só em aulas ao vivo (evento, contexto Faculdade): estado de presença. */
+  liveClassStatus?: LiveClassStatus
+}
+
+/** Disciplina da Faculdade — sigla curta + nome completo. */
+export interface Discipline {
+  id: string
+  sigla: string
+  name: string
+}
+
+/**
+ * Unidade de uma disciplina (UN3, UN4…) — tem só aula e revisão (3.1). O
+ * estado de cada uma é derivado dos Items ligados por `unitId`, nunca
+ * guardado aqui, pra não desincronizar.
+ */
+export interface Unit {
+  id: string
+  disciplineId: string
+  number: number
+  size: ItemSize
+  pages?: number
+}
+
+export type LiveClassStatus = 'vou' | 'nao' | 'assisti'
+
+/** Notas livres da Faculdade — uma geral e, opcionalmente, uma por disciplina. */
+export interface FacultyNotes {
+  general: string
+  byDiscipline: Record<string, string>
 }
 
 /** Contexto — lista editável (Pessoal, Faculdade, GAEB, Conexão, Acampamento, Estágio…). */

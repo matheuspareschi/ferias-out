@@ -181,10 +181,54 @@ describe('normalizeState — v1 (Item único, com cor/checklist) → v2', () => 
   })
 })
 
+describe('normalizeState — v2 (sem Faculdade) → v3', () => {
+  function v2State(overrides: Record<string, unknown> = {}) {
+    return {
+      schemaVersion: 2,
+      contexts: [{ id: 'pessoal', label: 'Pessoal' }, { id: 'faculdade', label: 'Faculdade' }],
+      dayMeta: {},
+      anchorDayId: '2026-09-25',
+      items: [{ id: 'i1', type: 'task', title: 'Lavar o carro', context: 'pessoal', order: 0, done: false }],
+      ...overrides,
+    }
+  }
+
+  it('seeds the default discipline list and starts with no units', () => {
+    const result = normalizeState(v2State())
+    expect(result?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(result?.disciplines.map((d) => d.sigla)).toEqual(['HB', 'HC', 'AT', 'NT', 'EC'])
+    expect(result?.units).toEqual([])
+    expect(result?.facultyNotes).toEqual({ general: '', byDiscipline: {} })
+  })
+
+  it('leaves existing items untouched', () => {
+    const result = normalizeState(v2State())
+    expect(result?.items).toHaveLength(1)
+    expect(result?.items[0].id).toBe('i1')
+  })
+
+  it('chains all the way from v0 and from v1 too', () => {
+    const fromV0 = normalizeState({ agendaItems: [], backlogItems: [], anchorDayId: '2026-09-25' })
+    expect(fromV0?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(fromV0?.disciplines.length).toBeGreaterThan(0)
+
+    const fromV1 = normalizeState({
+      schemaVersion: 1,
+      contexts: [{ id: 'pessoal', label: 'Pessoal' }],
+      dayMeta: {},
+      anchorDayId: '2026-09-25',
+      items: [],
+    })
+    expect(fromV1?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(fromV1?.disciplines.length).toBeGreaterThan(0)
+  })
+})
+
 describe('needsMigration', () => {
-  it('is true for legacy v0 shapes and for v1', () => {
+  it('is true for legacy v0 shapes, v1 and v2', () => {
     expect(needsMigration({ agendaItems: [], backlogItems: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 1, items: [], anchorDayId: '2026-09-25' })).toBe(true)
+    expect(needsMigration({ schemaVersion: 2, items: [], anchorDayId: '2026-09-25' })).toBe(true)
   })
 
   it('is false for the current shape and for garbage', () => {
@@ -204,6 +248,8 @@ describe('normalizeState — current shape passthrough', () => {
       anchorDayId: '2026-09-25',
     })
     expect(result?.items[0]).toMatchObject({ id: 'i1', title: 'Tarefa', type: 'task', done: false, order: 0 })
+    expect(result?.disciplines.length).toBeGreaterThan(0)
+    expect(result?.units).toEqual([])
   })
 
   it('returns null for unrecognizable input', () => {

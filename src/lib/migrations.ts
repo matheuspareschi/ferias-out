@@ -1,8 +1,20 @@
 import { DEFAULT_CONTEXT_ID, DEFAULT_CONTEXTS } from './contexts'
 import { todayId } from './dates'
-import type { Context, DayCategoryId, DayMeta, HabitId, Item, ItemSize, PeriodId } from './types'
+import { DEFAULT_DISCIPLINES } from './disciplines'
+import type {
+  Context,
+  DayCategoryId,
+  DayMeta,
+  Discipline,
+  FacultyNotes,
+  HabitId,
+  Item,
+  ItemSize,
+  PeriodId,
+  Unit,
+} from './types'
 
-export const CURRENT_SCHEMA_VERSION = 2 as const
+export const CURRENT_SCHEMA_VERSION = 3 as const
 
 export interface PlannerState {
   schemaVersion: typeof CURRENT_SCHEMA_VERSION
@@ -10,6 +22,9 @@ export interface PlannerState {
   contexts: Context[]
   dayMeta: Record<string, DayMeta>
   anchorDayId: string
+  disciplines: Discipline[]
+  units: Unit[]
+  facultyNotes: FacultyNotes
 }
 
 /** Rotina-base gravada antes da HabitStrip existir não tinha o campo `habit`. */
@@ -205,9 +220,17 @@ function migrateV0ToV1(raw: LegacyStateV0): PlannerStateV1 {
 }
 
 // ---------------------------------------------------------------------------
-// v1 → v2 (atual): sem cor por item; checklist vira subtarefas reais; tamanho
-// só sobrevive em itens do contexto Faculdade.
+// v1 → v2: sem cor por item; checklist vira subtarefas reais; tamanho só
+// sobrevive em itens do contexto Faculdade.
 // ---------------------------------------------------------------------------
+
+interface PlannerStateV2 {
+  schemaVersion: 2
+  items: Item[]
+  contexts: Context[]
+  dayMeta: Record<string, DayMeta>
+  anchorDayId: string
+}
 
 /**
  * v1 → v2: remove `color` (sem cor por item, v2 da especificação); cada
@@ -216,7 +239,7 @@ function migrateV0ToV1(raw: LegacyStateV0): PlannerStateV1 {
  * existir em itens do contexto Faculdade — os demais perdem o campo aqui
  * (o blob pré-migração guarda o valor original). Pura.
  */
-function migrateV1ToV2(v1: PlannerStateV1): PlannerState {
+function migrateV1ToV2(v1: PlannerStateV1): PlannerStateV2 {
   const items: Item[] = []
 
   for (const raw of v1.items) {
@@ -241,11 +264,34 @@ function migrateV1ToV2(v1: PlannerStateV1): PlannerState {
   }
 
   return {
-    schemaVersion: CURRENT_SCHEMA_VERSION,
+    schemaVersion: 2,
     items,
     contexts: v1.contexts,
     dayMeta: v1.dayMeta,
     anchorDayId: v1.anchorDayId,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// v2 → v3 (atual): adiciona o módulo Faculdade (disciplinas, unidades,
+// notas) — nenhum Item existente muda, só ganham os novos campos opcionais.
+// ---------------------------------------------------------------------------
+
+/**
+ * v2 → v3: entra com as disciplinas iniciais (3.1, lista editável depois) e
+ * nenhuma unidade ainda — o usuário cadastra as unidades na página da
+ * Faculdade. Pura.
+ */
+function migrateV2ToV3(v2: PlannerStateV2): PlannerState {
+  return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    items: v2.items,
+    contexts: v2.contexts,
+    dayMeta: v2.dayMeta,
+    anchorDayId: v2.anchorDayId,
+    disciplines: DEFAULT_DISCIPLINES,
+    units: [],
+    facultyNotes: { general: '', byDiscipline: {} },
   }
 }
 
@@ -271,13 +317,30 @@ function normalizeItem(raw: Partial<Item>): Item | null {
     referenceMonth: raw.referenceMonth,
     migratedFrom: raw.migratedFrom,
     parentId: raw.parentId,
+    unitId: raw.unitId,
+    unitRole: raw.unitRole,
+    reviewIndex: raw.reviewIndex,
+    isDelivery: raw.isDelivery,
+    disciplineId: raw.disciplineId,
+    liveClassStatus: raw.liveClassStatus,
+  }
+}
+
+function normalizeUnit(raw: Partial<Unit>): Unit | null {
+  if (!raw || typeof raw.id !== 'string' || typeof raw.disciplineId !== 'string') return null
+  return {
+    id: raw.id,
+    disciplineId: raw.disciplineId,
+    number: raw.number ?? 0,
+    size: raw.size ?? 'M',
+    pages: raw.pages,
   }
 }
 
 /**
  * Ponto único de entrada pra carregar um blob salvo (localStorage ou
  * Supabase) — decide se já está no formato atual ou encadeia as migrações
- * necessárias (v0→v1→v2). Retorna `null` se o formato for irreconhecível
+ * necessárias (v0→v1→v2→v3). Retorna `null` se o formato for irreconhecível
  * (cai pro seed).
  */
 export function normalizeState(parsed: unknown): PlannerState | null {
@@ -291,21 +354,36 @@ export function normalizeState(parsed: unknown): PlannerState | null {
       Array.isArray(obj.contexts) && (obj.contexts as Context[]).length > 0
         ? (obj.contexts as Context[])
         : DEFAULT_CONTEXTS
+    const units = Array.isArray(obj.units)
+      ? (obj.units as Partial<Unit>[]).map(normalizeUnit).filter((u): u is Unit => u !== null)
+      : []
+    const disciplines =
+      Array.isArray(obj.disciplines) && (obj.disciplines as Discipline[]).length > 0
+        ? (obj.disciplines as Discipline[])
+        : DEFAULT_DISCIPLINES
+    const facultyNotes = obj.facultyNotes as Partial<FacultyNotes> | undefined
     return {
       schemaVersion: CURRENT_SCHEMA_VERSION,
       items,
       contexts,
       dayMeta: (obj.dayMeta as Record<string, DayMeta>) ?? {},
       anchorDayId: obj.anchorDayId,
+      disciplines,
+      units,
+      facultyNotes: { general: facultyNotes?.general ?? '', byDiscipline: facultyNotes?.byDiscipline ?? {} },
     }
   }
 
+  if (obj.schemaVersion === 2) {
+    return migrateV2ToV3(obj as unknown as PlannerStateV2)
+  }
+
   if (obj.schemaVersion === 1) {
-    return migrateV1ToV2(obj as unknown as PlannerStateV1)
+    return migrateV2ToV3(migrateV1ToV2(obj as unknown as PlannerStateV1))
   }
 
   if (isLegacyV0(obj)) {
-    return migrateV1ToV2(migrateV0ToV1(obj as LegacyStateV0))
+    return migrateV2ToV3(migrateV1ToV2(migrateV0ToV1(obj as LegacyStateV0)))
   }
 
   return null
@@ -316,5 +394,5 @@ export function needsMigration(parsed: unknown): boolean {
   if (!parsed || typeof parsed !== 'object') return false
   const obj = parsed as Record<string, unknown>
   if (obj.schemaVersion === CURRENT_SCHEMA_VERSION) return false
-  return obj.schemaVersion === 1 || isLegacyV0(obj)
+  return obj.schemaVersion === 1 || obj.schemaVersion === 2 || isLegacyV0(obj)
 }
