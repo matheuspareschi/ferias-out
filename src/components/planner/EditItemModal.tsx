@@ -1,11 +1,10 @@
-import { Plus, Trash2, X } from 'lucide-react'
+import { CalendarPlus, Inbox, Plus, Trash2, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { ItemBullet } from '@/components/ItemBullet'
-import { ACCENT_OPTIONS, ACCENT_STYLES } from '@/lib/categoryStyles'
-import { formatDayShort } from '@/lib/days'
+import { ItemGlyph } from '@/components/ItemGlyph'
 import { PERIOD_LABEL, PERIOD_ORDER } from '@/lib/periods'
-import type { AccentColor, Context, Item, ItemSize, ItemType, PeriodId, Subitem } from '@/lib/types'
+import type { Context, Item, ItemSize, ItemType, PeriodId } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import type { MoveAction } from './ItemRow'
 
 export type ModalState = { type: 'item'; item: Item } | { type: 'new'; dayId: string } | null
 
@@ -17,24 +16,38 @@ export interface ItemFormData {
   dayId?: string
   period: PeriodId | null
   timeNote?: string
-  color: AccentColor
-  subitems?: Subitem[]
 }
 
 interface EditItemModalProps {
   state: ModalState
+  /** Lista completa — pra achar as subtarefas do item em edição. */
+  items: Item[]
   contexts: Context[]
   onClose: () => void
   onSave: (id: string | null, data: ItemFormData) => void
   onDelete: (id: string) => void
   onAddContext: (label: string) => string
+  onMove: (item: Item, action: MoveAction) => void
+  onToggleItemDone: (id: string) => void
+  onAddSubtask: (parentId: string, title: string) => void
 }
 
 const inputClass =
-  'rounded-sm border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-rust'
+  'rounded-sm border border-line bg-paper px-2 py-1.5 text-sm text-ink outline-none focus:border-accent'
 const NEW_CONTEXT_VALUE = '__new__'
 
-export function EditItemModal({ state, contexts, onClose, onSave, onDelete, onAddContext }: EditItemModalProps) {
+export function EditItemModal({
+  state,
+  items,
+  contexts,
+  onClose,
+  onSave,
+  onDelete,
+  onAddContext,
+  onMove,
+  onToggleItemDone,
+  onAddSubtask,
+}: EditItemModalProps) {
   if (!state) return null
 
   return (
@@ -51,10 +64,14 @@ export function EditItemModal({ state, contexts, onClose, onSave, onDelete, onAd
           key={state.type === 'item' ? state.item.id : `new-${state.dayId}`}
           item={state.type === 'item' ? state.item : null}
           dayId={state.type === 'item' ? state.item.dayId : state.dayId}
+          items={items}
           contexts={contexts}
           onSave={onSave}
           onDelete={onDelete}
           onAddContext={onAddContext}
+          onMove={onMove}
+          onToggleItemDone={onToggleItemDone}
+          onAddSubtask={onAddSubtask}
           onClose={onClose}
         />
       </div>
@@ -79,9 +96,7 @@ function PeriodPicker({
           onClick={() => onChange(null)}
           className={cn(
             'rounded-sm border px-2 py-1 text-xs',
-            value === null
-              ? 'border-ink bg-ink text-paper'
-              : 'border-line text-ink-dim hover:border-line-strong',
+            value === null ? 'border-ink bg-ink text-paper' : 'border-line text-ink-dim hover:border-line-strong',
           )}
         >
           sem período
@@ -107,18 +122,26 @@ function PeriodPicker({
 function ItemForm({
   item,
   dayId,
+  items,
   contexts,
   onSave,
   onDelete,
   onAddContext,
+  onMove,
+  onToggleItemDone,
+  onAddSubtask,
   onClose,
 }: {
   item: Item | null
   dayId: string | undefined
+  items: Item[]
   contexts: Context[]
   onSave: EditItemModalProps['onSave']
   onDelete: EditItemModalProps['onDelete']
   onAddContext: EditItemModalProps['onAddContext']
+  onMove: EditItemModalProps['onMove']
+  onToggleItemDone: EditItemModalProps['onToggleItemDone']
+  onAddSubtask: EditItemModalProps['onAddSubtask']
   onClose: () => void
 }) {
   const [type, setType] = useState<ItemType>(item?.type ?? 'task')
@@ -128,10 +151,14 @@ function ItemForm({
   const [size, setSize] = useState<ItemSize | undefined>(item?.size)
   const [period, setPeriod] = useState<PeriodId | null>(item?.period ?? null)
   const [timeNote, setTimeNote] = useState(item?.timeNote ?? '')
-  const [color, setColor] = useState<AccentColor>(item?.color ?? 'clay')
-  const [subitems, setSubitems] = useState<Subitem[]>(item?.subitems ?? [])
-  const [newSubitem, setNewSubitem] = useState('')
-  const [currentDayId, setCurrentDayId] = useState(dayId)
+  const [currentDayId] = useState(dayId)
+  const [newSubtask, setNewSubtask] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [pickingDate, setPickingDate] = useState(false)
+  const isFaculdade = context === 'faculdade'
+
+  const children = item ? items.filter((it) => it.parentId === item.id).sort((a, b) => a.order - b.order) : []
+  const parent = item?.parentId ? items.find((it) => it.id === item.parentId) : undefined
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -141,21 +168,19 @@ function ItemForm({
       type,
       title: title.trim(),
       context: finalContext || contexts[0]?.id || '',
-      size,
+      size: isFaculdade ? size : undefined,
       dayId: currentDayId,
       period: currentDayId ? period : null,
       timeNote: timeNote.trim() || undefined,
-      color,
-      subitems: subitems.length > 0 ? subitems : undefined,
     })
     onClose()
   }
 
-  function addSubitem() {
-    const trimmed = newSubitem.trim()
-    if (!trimmed) return
-    setSubitems((prev) => [...prev, { id: `sub-${Date.now().toString(36)}`, title: trimmed, done: false }])
-    setNewSubitem('')
+  function handleAddSubtask() {
+    const trimmed = newSubtask.trim()
+    if (!trimmed || !item) return
+    onAddSubtask(item.id, trimmed)
+    setNewSubtask('')
   }
 
   return (
@@ -166,6 +191,9 @@ function ItemForm({
           <X className="size-4" />
         </button>
       </div>
+
+      {parent && <p className="text-xs text-ink-faint">{parent.title} › subtarefa</p>}
+
       <div className="flex gap-1.5">
         {(['task', 'event'] as const).map((t) => (
           <button
@@ -177,7 +205,7 @@ function ItemForm({
               type === t ? 'border-ink bg-ink text-paper' : 'border-line text-ink-dim hover:border-line-strong',
             )}
           >
-            <ItemBullet type={t} done={false} onChange={() => {}} className="pointer-events-none" />
+            <ItemGlyph type={t} done={false} onChange={() => {}} interactive={false} />
             {t === 'task' ? 'tarefa' : 'evento'}
           </button>
         ))}
@@ -192,11 +220,7 @@ function ItemForm({
       <div className="flex gap-2">
         <label className="flex flex-1 flex-col gap-1 text-xs text-ink-dim">
           Contexto
-          <select
-            value={context}
-            onChange={(e) => setContext(e.target.value)}
-            className={inputClass}
-          >
+          <select value={context} onChange={(e) => setContext(e.target.value)} className={inputClass}>
             {contexts.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.label}
@@ -205,24 +229,26 @@ function ItemForm({
             <option value={NEW_CONTEXT_VALUE}>+ novo contexto…</option>
           </select>
         </label>
-        <div className="flex flex-col gap-1 text-xs text-ink-dim">
-          Tamanho
-          <div className="flex gap-1">
-            {(['P', 'M', 'G'] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setSize((v) => (v === s ? undefined : s))}
-                className={cn(
-                  'size-8 rounded-sm border font-mono text-xs',
-                  size === s ? 'border-rust bg-rust text-paper-raised' : 'border-line text-ink-dim hover:border-line-strong',
-                )}
-              >
-                {s}
-              </button>
-            ))}
+        {isFaculdade && (
+          <div className="flex flex-col gap-1 text-xs text-ink-dim">
+            Tamanho
+            <div className="flex gap-1">
+              {(['P', 'M', 'G'] as const).map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSize((v) => (v === s ? undefined : s))}
+                  className={cn(
+                    'size-8 rounded-sm border font-mono text-xs',
+                    size === s ? 'border-accent bg-accent text-paper-raised' : 'border-line text-ink-dim hover:border-line-strong',
+                  )}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
       {context === NEW_CONTEXT_VALUE && (
         <input
@@ -234,17 +260,8 @@ function ItemForm({
       )}
 
       {currentDayId && (
-        <div className="flex flex-col gap-2 rounded-sm border border-line bg-paper p-2">
-          <div className="flex items-center justify-between text-xs text-ink-dim">
-            <span>agendado em {formatDayShort(currentDayId)}</span>
-            <button
-              type="button"
-              onClick={() => setCurrentDayId(undefined)}
-              className="text-rust hover:underline"
-            >
-              voltar ao backlog
-            </button>
-          </div>
+        <div className="flex flex-col gap-1 text-xs text-ink-dim">
+          Período
           <PeriodPicker value={period} onChange={setPeriod} />
         </div>
       )}
@@ -259,97 +276,140 @@ function ItemForm({
         />
       </label>
 
-      <div className="flex flex-col gap-1 text-xs text-ink-dim">
-        Cor
-        <div className="flex gap-1.5">
-          {ACCENT_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              title={opt.label}
-              aria-label={opt.label}
-              aria-pressed={color === opt.value}
-              onClick={() => setColor(opt.value)}
-              className={cn(
-                'size-6 rounded-full border-2',
-                ACCENT_STYLES[opt.value].bg,
-                ACCENT_STYLES[opt.value].border,
-                color === opt.value ? 'ring-2 ring-ink ring-offset-1 ring-offset-paper-raised' : '',
-              )}
+      {item && !item.parentId && (
+        <div className="flex flex-col gap-1.5 text-xs text-ink-dim">
+          Subtarefas
+          {children.length > 0 && (
+            <ul className="flex flex-col gap-1">
+              {children.map((child) => (
+                <li key={child.id} className="flex items-center gap-1.5">
+                  <ItemGlyph type="task" done={child.done} subtask onChange={() => onToggleItemDone(child.id)} size="sm" />
+                  <span className={cn('flex-1 truncate text-ink', child.done && 'text-ink-faint line-through')}>
+                    {child.title}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(child.id)}
+                    className="text-ink-faint hover:text-attention"
+                    aria-label="Remover subtarefa"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex gap-1">
+            <input
+              value={newSubtask}
+              onChange={(e) => setNewSubtask(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  handleAddSubtask()
+                }
+              }}
+              placeholder="adicionar subtarefa…"
+              disabled={!item}
+              className={cn(inputClass, 'flex-1')}
             />
-          ))}
+            <button
+              type="button"
+              onClick={handleAddSubtask}
+              disabled={!item}
+              className="flex shrink-0 items-center justify-center rounded-sm border border-line px-2 text-ink-dim hover:border-line-strong disabled:opacity-40"
+              aria-label="Adicionar subtarefa"
+            >
+              <Plus className="size-3.5" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="flex flex-col gap-1.5 text-xs text-ink-dim">
-        Checklist (opcional)
-        {subitems.length > 0 && (
-          <ul className="flex flex-col gap-1">
-            {subitems.map((sub) => (
-              <li key={sub.id} className="flex items-center gap-1.5">
-                <ItemBullet
-                  type="task"
-                  done={sub.done}
-                  onChange={() =>
-                    setSubitems((prev) => prev.map((s) => (s.id === sub.id ? { ...s, done: !s.done } : s)))
+      {item && (
+        <div className="flex flex-col gap-1.5 rounded-sm border border-line bg-paper p-2">
+          <p className="text-[10px] uppercase tracking-wide text-ink-faint">Mover</p>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                onMove(item, { kind: 'tomorrow' })
+                onClose()
+              }}
+              className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim hover:border-line-strong"
+            >
+              <CalendarPlus className="size-3" /> amanhã
+            </button>
+            {pickingDate ? (
+              <input
+                type="date"
+                autoFocus
+                onChange={(e) => {
+                  if (e.target.value) {
+                    onMove(item, { kind: 'date', dayId: e.target.value })
+                    onClose()
                   }
-                  size="sm"
-                />
-                <span className={cn('flex-1 truncate text-ink', sub.done && 'line-through opacity-60')}>
-                  {sub.title}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setSubitems((prev) => prev.filter((s) => s.id !== sub.id))}
-                  className="text-ink-faint hover:text-rust"
-                  aria-label="Remover subitem"
-                >
-                  <X className="size-3" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="flex gap-1">
-          <input
-            value={newSubitem}
-            onChange={(e) => setNewSubitem(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                addSubitem()
-              }
-            }}
-            placeholder="adicionar subitem…"
-            className={cn(inputClass, 'flex-1')}
-          />
-          <button
-            type="button"
-            onClick={addSubitem}
-            className="flex shrink-0 items-center justify-center rounded-sm border border-line px-2 text-ink-dim hover:border-line-strong"
-            aria-label="Adicionar subitem"
-          >
-            <Plus className="size-3.5" />
-          </button>
+                }}
+                onBlur={() => setPickingDate(false)}
+                className="rounded-sm border border-line px-2 py-1 text-xs"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setPickingDate(true)}
+                className="rounded-sm border border-line px-2 py-1 text-xs text-ink-dim hover:border-line-strong"
+              >
+                outro dia…
+              </button>
+            )}
+            {item.dayId && (
+              <button
+                type="button"
+                onClick={() => {
+                  onMove(item, { kind: 'backlog' })
+                  onClose()
+                }}
+                className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim hover:border-line-strong"
+              >
+                <Inbox className="size-3" /> voltar ao backlog
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mt-1 flex items-center justify-between">
         {item ? (
-          <button
-            type="button"
-            onClick={() => {
-              onDelete(item.id)
-              onClose()
-            }}
-            className="flex items-center gap-1 text-xs text-rust hover:underline"
-          >
-            <Trash2 className="size-3.5" /> excluir
-          </button>
+          confirmDelete ? (
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className="text-ink-dim">excluir mesmo?</span>
+              <button
+                type="button"
+                onClick={() => {
+                  onDelete(item.id)
+                  onClose()
+                }}
+                className="text-attention hover:underline"
+              >
+                sim
+              </button>
+              <button type="button" onClick={() => setConfirmDelete(false)} className="text-ink-dim hover:underline">
+                não
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="flex items-center gap-1 text-xs text-attention hover:underline"
+            >
+              <Trash2 className="size-3.5" /> excluir
+            </button>
+          )
         ) : (
           <span />
         )}
-        <button type="submit" className="rounded-sm bg-ink px-3 py-1.5 text-xs text-paper hover:bg-rust">
+        <button type="submit" className="rounded-sm bg-ink px-3 py-1.5 text-xs text-paper hover:bg-accent">
           salvar
         </button>
       </div>

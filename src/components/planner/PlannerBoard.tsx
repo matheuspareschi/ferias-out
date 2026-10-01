@@ -1,16 +1,15 @@
 import { DndContext, DragOverlay, MouseSensor, TouchSensor, pointerWithin, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent, DragPendingEvent, DragStartEvent } from '@dnd-kit/core'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
 import { addDays, todayId } from '@/lib/dates'
 import { daysAround } from '@/lib/days'
 import { type ContainerRef, itemDndId, parseContainerId, PendingDndContext, splitDndId } from '@/lib/dnd'
-import type { ItemSize, PeriodId } from '@/lib/types'
+import type { Item, PeriodId } from '@/lib/types'
 import { BacklogSidebar } from './BacklogSidebar'
 import { DayColumn } from './DayColumn'
 import { EditItemModal, type ModalState } from './EditItemModal'
-import { PendingReviewPanel } from './PendingReviewPanel'
+import type { MoveAction } from './ItemRow'
 
 interface PlannerBoardProps {
   planner: UsePlannerReturn
@@ -43,15 +42,9 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
   }
 
   // Calendário sem fim: sempre 3 dias (ontem/hoje/amanhã em relação à âncora),
-  // sem limite de início ou fim pra nenhum dos lados.
+  // sem limite de início ou fim pra nenhum dos lados. A navegação prev/seguinte
+  // mora no cabeçalho do app (nav de topo), não aqui.
   const windowDays = daysAround(planner.anchorDayId, 1, 1)
-
-  function goPrev() {
-    planner.setAnchorDay(addDays(planner.anchorDayId, -1))
-  }
-  function goNext() {
-    planner.setAnchorDay(addDays(planner.anchorDayId, 1))
-  }
 
   function handleDragStart(event: DragStartEvent) {
     setPendingDndId(null)
@@ -128,18 +121,47 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
     planner.updateItem(id, { dayId: target.dayId, period, order })
   }
 
-  function migrateToDay(id: string, dayId: string) {
-    const item = planner.items.find((i) => i.id === id)
-    if (!item) return
-    const container: ContainerRef = { type: 'unassigned', dayId }
-    const order = appendOrder(container, itemDndId(id))
-    planner.updateItem(id, { dayId, period: null, order, migratedFrom: item.dayId })
+  /** Ações de mover (linha ou modal): amanhã / outro dia / voltar ao backlog / excluir. */
+  function handleMoveItem(item: Item, action: MoveAction) {
+    if (action.kind === 'delete') {
+      planner.deleteItem(item.id)
+      return
+    }
+    if (action.kind === 'backlog') {
+      planner.updateItem(item.id, { dayId: undefined, period: null, migratedFrom: item.dayId })
+      return
+    }
+    const dayId = action.kind === 'tomorrow' ? addDays(item.dayId ?? todayId(), 1) : action.dayId
+    const container: ContainerRef = item.period ? { type: 'period', dayId, period: item.period } : { type: 'unassigned', dayId }
+    const order = appendOrder(container, itemDndId(item.id))
+    planner.updateItem(item.id, { dayId, period: item.period, order, migratedFrom: item.dayId })
   }
 
-  function backToBacklog(id: string) {
-    const item = planner.items.find((i) => i.id === id)
+  /** Concluir manualmente um pai com subtarefas pendentes pede confirmação antes de cascatear. */
+  function handleToggleDone(id: string) {
+    const item = planner.items.find((it) => it.id === id)
     if (!item) return
-    planner.updateItem(id, { dayId: undefined, period: null, migratedFrom: item.dayId })
+    const children = planner.items.filter((it) => it.parentId === id)
+    const hasPending = children.some((c) => !c.done)
+    if (!item.done && children.length > 0 && hasPending) {
+      if (!window.confirm('Esta tarefa tem subtarefas pendentes. Concluir todas mesmo assim?')) return
+      planner.toggleDone(id, { cascadeToChildren: true })
+      return
+    }
+    planner.toggleDone(id)
+  }
+
+  function handleAddSubtask(parentId: string, title: string) {
+    const parent = planner.items.find((it) => it.id === parentId)
+    if (!parent) return
+    planner.addItem({
+      type: 'task',
+      title,
+      context: parent.context,
+      dayId: parent.dayId,
+      period: parent.period,
+      parentId,
+    })
   }
 
   return (
@@ -158,29 +180,6 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
       <PendingDndContext.Provider value={pendingDndId}>
         <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:overflow-hidden">
           <div className="flex flex-1 flex-col gap-2 lg:overflow-hidden">
-            <PendingReviewPanel
-              items={planner.items}
-              onMigrateToday={(id) => migrateToDay(id, todayId())}
-              onMigrateDate={migrateToDay}
-              onBackToBacklog={backToBacklog}
-              onDiscard={planner.deleteItem}
-            />
-            <div className="flex items-center justify-between px-1">
-              <button
-                type="button"
-                onClick={goPrev}
-                className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
-              >
-                <ChevronLeft className="size-3.5" /> anterior
-              </button>
-              <button
-                type="button"
-                onClick={goNext}
-                className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
-              >
-                seguinte <ChevronRight className="size-3.5" />
-              </button>
-            </div>
             <div className="grid flex-1 auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:overflow-hidden">
               {windowDays.map((day) => {
                 const isAnchor = day.id === planner.anchorDayId
@@ -191,12 +190,14 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
                       weekday={day.weekday}
                       isAnchor={isAnchor}
                       items={planner.items.filter((i) => i.dayId === day.id)}
+                      allItems={planner.items}
                       meta={planner.dayMeta[day.id] ?? {}}
                       onSetCategory={planner.setDayCategory}
                       onSetNote={planner.setDayNote}
-                      onToggleDone={planner.toggleDone}
+                      onToggleDone={handleToggleDone}
                       onOpenItem={(item) => setModal({ type: 'item', item })}
                       onAddItem={(dayId) => setModal({ type: 'new', dayId })}
+                      onMoveItem={handleMoveItem}
                     />
                   </div>
                 )
@@ -207,18 +208,10 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
           <BacklogSidebar
             items={planner.items}
             contexts={planner.contexts}
-            onToggleDone={planner.toggleDone}
-            onToggleSubitem={(itemId, subitemId) => {
-              const item = planner.items.find((i) => i.id === itemId)
-              if (!item?.subitems) return
-              planner.updateItem(itemId, {
-                subitems: item.subitems.map((s) => (s.id === subitemId ? { ...s, done: !s.done } : s)),
-              })
-            }}
+            onToggleDone={handleToggleDone}
             onOpen={(item) => setModal({ type: 'item', item })}
-            onAdd={(data: { title: string; context: string; size: ItemSize }) =>
-              planner.addItem({ type: 'task', ...data })
-            }
+            onAdd={(data) => planner.addItem({ type: 'task', ...data })}
+            onMoveItem={handleMoveItem}
           />
         </div>
       </PendingDndContext.Provider>
@@ -233,6 +226,7 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
 
       <EditItemModal
         state={modal}
+        items={planner.items}
         contexts={planner.contexts}
         onClose={() => setModal(null)}
         onAddContext={planner.addContext}
@@ -259,6 +253,9 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
           }
         }}
         onDelete={planner.deleteItem}
+        onMove={handleMoveItem}
+        onToggleItemDone={handleToggleDone}
+        onAddSubtask={handleAddSubtask}
       />
     </DndContext>
   )
