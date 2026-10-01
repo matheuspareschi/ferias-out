@@ -1,29 +1,25 @@
 import { Plus } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import type { BacklogCategory, BacklogSize } from '@/lib/types'
+import { DEFAULT_CONTEXT_ID } from '@/lib/contexts'
+import type { Context, ItemSize } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 interface AddBacklogItemFormProps {
-  onAdd: (data: { title: string; category: BacklogCategory; size: BacklogSize }) => void
+  contexts: Context[]
+  onAdd: (data: { title: string; context: string; size: ItemSize }) => void
 }
 
-const CATEGORIES: { value: BacklogCategory; label: string }[] = [
-  { value: 'aula', label: 'Aula' },
-  { value: 'preparo', label: 'Preparo' },
-  { value: 'tarefa', label: 'Tarefa' },
-]
+const SIZES: ItemSize[] = ['P', 'M', 'G']
 
-const SIZES: BacklogSize[] = ['P', 'M', 'G']
-
-export function AddBacklogItemForm({ onAdd }: AddBacklogItemFormProps) {
+export function AddBacklogItemForm({ contexts, onAdd }: AddBacklogItemFormProps) {
   const [title, setTitle] = useState('')
-  const [category, setCategory] = useState<BacklogCategory>('tarefa')
-  const [size, setSize] = useState<BacklogSize>('M')
+  const [context, setContext] = useState<string>(DEFAULT_CONTEXT_ID)
+  const [size, setSize] = useState<ItemSize>('M')
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
-    onAdd({ title, category, size })
+    onAdd({ title, context, size })
     setTitle('')
   }
 
@@ -40,12 +36,12 @@ export function AddBacklogItemForm({ onAdd }: AddBacklogItemFormProps) {
       />
       <div className="flex items-center gap-1.5">
         <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value as BacklogCategory)}
+          value={context}
+          onChange={(e) => setContext(e.target.value)}
           className="flex-1 rounded-sm border border-line bg-paper px-1.5 py-1 text-xs text-ink outline-none focus:border-rust"
         >
-          {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>
+          {contexts.map((c) => (
+            <option key={c.id} value={c.id}>
               {c.label}
             </option>
           ))}

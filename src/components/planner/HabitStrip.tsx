@@ -2,7 +2,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { BookOpen, Flame, Footprints, PersonStanding, Search, type LucideIcon } from 'lucide-react'
 import { draggableDragStyle, habitDndId, usePendingDnd } from '@/lib/dnd'
 import { PERIOD_LABEL } from '@/lib/periods'
-import type { AgendaItem, HabitId } from '@/lib/types'
+import type { Item, HabitId } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 const HABIT_ORDER: HabitId[] = ['devocional', 'alongamento', 'leitura', 'exercicio', 'revisao']
@@ -24,14 +24,14 @@ const HABIT_LABEL: Record<HabitId, string> = {
 }
 
 interface HabitStripProps {
-  items: AgendaItem[]
+  items: Item[]
   disabled?: boolean
   onToggle: (id: string) => void
 }
 
 export function HabitStrip({ items, disabled, onToggle }: HabitStripProps) {
   const byHabit = new Map(items.filter((it) => it.habit).map((it) => [it.habit as HabitId, it]))
-  const ordered = HABIT_ORDER.map((h) => byHabit.get(h)).filter((it): it is AgendaItem => Boolean(it))
+  const ordered = HABIT_ORDER.map((h) => byHabit.get(h)).filter((it): it is Item => Boolean(it))
 
   if (ordered.length === 0) return null
 
@@ -49,7 +49,7 @@ function HabitButton({
   disabled,
   onToggle,
 }: {
-  item: AgendaItem
+  item: Item
   disabled?: boolean
   onToggle: () => void
 }) {

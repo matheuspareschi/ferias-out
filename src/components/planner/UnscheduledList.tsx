@@ -1,16 +1,16 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext } from '@dnd-kit/sortable'
-import { agendaDndId, unassignedContainerId } from '@/lib/dnd'
-import type { AgendaItem } from '@/lib/types'
+import { itemDndId, unassignedContainerId } from '@/lib/dnd'
+import type { Item } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { UnscheduledPill } from './UnscheduledPill'
 
 interface UnscheduledListProps {
   dayId: string
-  items: AgendaItem[]
+  items: Item[]
   disabled?: boolean
   onToggleDone: (id: string) => void
-  onOpen: (item: AgendaItem) => void
+  onOpen: (item: Item) => void
 }
 
 export function UnscheduledList({ dayId, items, disabled, onToggleDone, onOpen }: UnscheduledListProps) {
@@ -29,7 +29,7 @@ export function UnscheduledList({ dayId, items, disabled, onToggleDone, onOpen }
         isOver && !disabled && 'border-line-strong bg-gold-soft/40',
       )}
     >
-      <SortableContext id={containerId} items={items.map((it) => agendaDndId(it.id))}>
+      <SortableContext id={containerId} items={items.map((it) => itemDndId(it.id))}>
         {items.length === 0 && (
           <span className="px-1 py-0.5 font-mono text-[9px] text-ink-faint">sem período</span>
         )}

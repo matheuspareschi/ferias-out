@@ -3,20 +3,14 @@ import type { DragEndEvent, DragPendingEvent, DragStartEvent } from '@dnd-kit/co
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
-import { addDays } from '@/lib/dates'
+import { addDays, todayId } from '@/lib/dates'
 import { daysAround } from '@/lib/days'
-import {
-  agendaDndId,
-  backlogAllocDndId,
-  type ContainerRef,
-  parseContainerId,
-  PendingDndContext,
-  splitDndId,
-} from '@/lib/dnd'
-import type { BacklogCategory, BacklogSize, PeriodId } from '@/lib/types'
+import { type ContainerRef, itemDndId, parseContainerId, PendingDndContext, splitDndId } from '@/lib/dnd'
+import type { ItemSize, PeriodId } from '@/lib/types'
 import { BacklogSidebar } from './BacklogSidebar'
 import { DayColumn } from './DayColumn'
 import { EditItemModal, type ModalState } from './EditItemModal'
+import { PendingReviewPanel } from './PendingReviewPanel'
 
 interface PlannerBoardProps {
   planner: UsePlannerReturn
@@ -63,42 +57,32 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
     setPendingDndId(null)
     const data = event.active.data.current as DragPayload | undefined
     if (!data) return
-    const { kind, id } = splitDndId(data.dndId)
-    const title =
-      kind === 'agenda'
-        ? planner.agendaItems.find((i) => i.id === id)?.title
-        : planner.backlogItems.find((i) => i.id === id)?.title
-    setActiveDragTitle(title ?? null)
+    const { id } = splitDndId(data.dndId)
+    setActiveDragTitle(planner.items.find((i) => i.id === id)?.title ?? null)
   }
 
   /** Ids (dndId) + order de tudo que já está no destino, na ordem atual. */
   function entriesFor(container: ContainerRef): { dndId: string; order: number }[] {
     if (container.type === 'sidebar') return []
     if (container.type === 'unassigned') {
-      return planner.agendaItems
+      return planner.items
         .filter((it) => it.dayId === container.dayId && !it.period)
-        .map((it) => ({ dndId: agendaDndId(it.id), order: it.order }))
+        .map((it) => ({ dndId: itemDndId(it.id), order: it.order }))
+        .sort((a, b) => a.order - b.order)
     }
-    const agenda = planner.agendaItems
+    return planner.items
       .filter((it) => it.dayId === container.dayId && it.period === container.period)
-      .map((it) => ({ dndId: agendaDndId(it.id), order: it.order }))
-    const backlog = planner.backlogItems
-      .filter((it) => it.allocation?.dayId === container.dayId && it.allocation?.period === container.period)
-      .map((it) => ({ dndId: backlogAllocDndId(it.id), order: it.allocation!.order }))
-    return [...agenda, ...backlog].sort((a, b) => a.order - b.order)
+      .map((it) => ({ dndId: itemDndId(it.id), order: it.order }))
+      .sort((a, b) => a.order - b.order)
   }
 
-  /** Resolve em qual container (período/sem período/sidebar) um id de item já está hoje. */
+  /** Resolve em qual container (período/sem período/sidebar) um item já está hoje. */
   function containerOfItem(dndId: string): ContainerRef | null {
-    const { kind, id } = splitDndId(dndId)
-    if (kind === 'agenda') {
-      const item = planner.agendaItems.find((i) => i.id === id)
-      if (!item) return null
-      return item.period ? { type: 'period', dayId: item.dayId, period: item.period } : { type: 'unassigned', dayId: item.dayId }
-    }
-    const item = planner.backlogItems.find((i) => i.id === id)
+    const { id } = splitDndId(dndId)
+    const item = planner.items.find((i) => i.id === id)
     if (!item) return null
-    return item.allocation ? { type: 'period', dayId: item.allocation.dayId, period: item.allocation.period } : { type: 'sidebar' }
+    if (!item.dayId) return { type: 'sidebar' }
+    return item.period ? { type: 'period', dayId: item.dayId, period: item.period } : { type: 'unassigned', dayId: item.dayId }
   }
 
   function resolveTarget(overId: string): ContainerRef | null {
@@ -128,25 +112,34 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
     if (!over || active.id === over.id) return
     const data = active.data.current as DragPayload | undefined
     if (!data) return
-    const { kind, id } = splitDndId(data.dndId)
+    const { id } = splitDndId(data.dndId)
 
     const target = resolveTarget(String(over.id))
     if (!target) return
 
     if (target.type === 'sidebar') {
-      if (kind === 'backlog') planner.unallocate(id)
+      planner.updateItem(id, { dayId: undefined, period: null })
       return
     }
 
     const entries = entriesFor(target)
     const order = computeOrder(entries, data.dndId, String(over.id))
+    const period: PeriodId | null = target.type === 'period' ? target.period : null
+    planner.updateItem(id, { dayId: target.dayId, period, order })
+  }
 
-    if (kind === 'agenda') {
-      const period: PeriodId | null = target.type === 'period' ? target.period : null
-      planner.updateAgendaItem(id, { dayId: target.dayId, period, order })
-    } else if (target.type === 'period') {
-      planner.allocate(id, target.dayId, target.period, order)
-    }
+  function migrateToDay(id: string, dayId: string) {
+    const item = planner.items.find((i) => i.id === id)
+    if (!item) return
+    const container: ContainerRef = { type: 'unassigned', dayId }
+    const order = appendOrder(container, itemDndId(id))
+    planner.updateItem(id, { dayId, period: null, order, migratedFrom: item.dayId })
+  }
+
+  function backToBacklog(id: string) {
+    const item = planner.items.find((i) => i.id === id)
+    if (!item) return
+    planner.updateItem(id, { dayId: undefined, period: null, migratedFrom: item.dayId })
   }
 
   return (
@@ -163,57 +156,71 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
       }}
     >
       <PendingDndContext.Provider value={pendingDndId}>
-      <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:overflow-hidden">
-        <div className="flex flex-1 flex-col gap-2 lg:overflow-hidden">
-          <div className="flex items-center justify-between px-1">
-            <button
-              type="button"
-              onClick={goPrev}
-              className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
-            >
-              <ChevronLeft className="size-3.5" /> anterior
-            </button>
-            <button
-              type="button"
-              onClick={goNext}
-              className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
-            >
-              seguinte <ChevronRight className="size-3.5" />
-            </button>
+        <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:overflow-hidden">
+          <div className="flex flex-1 flex-col gap-2 lg:overflow-hidden">
+            <PendingReviewPanel
+              items={planner.items}
+              onMigrateToday={(id) => migrateToDay(id, todayId())}
+              onMigrateDate={migrateToDay}
+              onBackToBacklog={backToBacklog}
+              onDiscard={planner.deleteItem}
+            />
+            <div className="flex items-center justify-between px-1">
+              <button
+                type="button"
+                onClick={goPrev}
+                className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
+              >
+                <ChevronLeft className="size-3.5" /> anterior
+              </button>
+              <button
+                type="button"
+                onClick={goNext}
+                className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
+              >
+                seguinte <ChevronRight className="size-3.5" />
+              </button>
+            </div>
+            <div className="grid flex-1 auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:overflow-hidden">
+              {windowDays.map((day) => {
+                const isAnchor = day.id === planner.anchorDayId
+                return (
+                  <div key={day.id} className={isAnchor ? 'contents' : 'hidden sm:contents'}>
+                    <DayColumn
+                      dayId={day.id}
+                      weekday={day.weekday}
+                      isAnchor={isAnchor}
+                      items={planner.items.filter((i) => i.dayId === day.id)}
+                      meta={planner.dayMeta[day.id] ?? {}}
+                      onSetCategory={planner.setDayCategory}
+                      onSetNote={planner.setDayNote}
+                      onToggleDone={planner.toggleDone}
+                      onOpenItem={(item) => setModal({ type: 'item', item })}
+                      onAddItem={(dayId) => setModal({ type: 'new', dayId })}
+                    />
+                  </div>
+                )
+              })}
+            </div>
           </div>
-          <div className="grid flex-1 auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:overflow-hidden">
-            {windowDays.map((day) => {
-              const isAnchor = day.id === planner.anchorDayId
-              return (
-                <div key={day.id} className={isAnchor ? 'contents' : 'hidden sm:contents'}>
-                  <DayColumn
-                    dayId={day.id}
-                    weekday={day.weekday}
-                    isAnchor={isAnchor}
-                    agendaItems={planner.agendaItems.filter((i) => i.dayId === day.id)}
-                    allocatedBacklogItems={planner.backlogItems.filter((i) => i.allocation?.dayId === day.id)}
-                    category={planner.dayCategories[day.id] ?? null}
-                    onSetCategory={planner.setDayCategory}
-                    onToggleDone={planner.toggleDone}
-                    onOpenAgenda={(item) => setModal({ type: 'agenda', item })}
-                    onOpenBacklog={(item) => setModal({ type: 'backlog', item })}
-                    onAddAgenda={(dayId) => setModal({ type: 'agenda-new', dayId })}
-                  />
-                </div>
-              )
-            })}
-          </div>
-        </div>
 
-        <BacklogSidebar
-          items={planner.backlogItems}
-          onToggleDone={planner.toggleDone}
-          onOpen={(item) => setModal({ type: 'backlog', item })}
-          onAdd={(data: { title: string; category: BacklogCategory; size: BacklogSize }) =>
-            planner.addBacklogItem(data)
-          }
-        />
-      </div>
+          <BacklogSidebar
+            items={planner.items}
+            contexts={planner.contexts}
+            onToggleDone={planner.toggleDone}
+            onToggleSubitem={(itemId, subitemId) => {
+              const item = planner.items.find((i) => i.id === itemId)
+              if (!item?.subitems) return
+              planner.updateItem(itemId, {
+                subitems: item.subitems.map((s) => (s.id === subitemId ? { ...s, done: !s.done } : s)),
+              })
+            }}
+            onOpen={(item) => setModal({ type: 'item', item })}
+            onAdd={(data: { title: string; context: string; size: ItemSize }) =>
+              planner.addItem({ type: 'task', ...data })
+            }
+          />
+        </div>
       </PendingDndContext.Provider>
 
       <DragOverlay>
@@ -226,28 +233,32 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
 
       <EditItemModal
         state={modal}
+        contexts={planner.contexts}
         onClose={() => setModal(null)}
-        onSaveAgenda={(id, dayId, data) => {
-          const container: ContainerRef = data.period
-            ? { type: 'period', dayId, period: data.period }
-            : { type: 'unassigned', dayId }
+        onAddContext={planner.addContext}
+        onSave={(id, data) => {
           if (id) {
-            const existing = planner.agendaItems.find((i) => i.id === id)
-            const samePlace = existing && existing.dayId === dayId && existing.period === data.period
-            const order = samePlace ? existing.order : appendOrder(container, agendaDndId(id))
-            planner.updateAgendaItem(id, { ...data, dayId, order })
+            const existing = planner.items.find((i) => i.id === id)
+            const samePlace = existing && existing.dayId === data.dayId && existing.period === data.period
+            const order = samePlace
+              ? existing.order
+              : data.dayId
+                ? appendOrder(
+                    data.period ? { type: 'period', dayId: data.dayId, period: data.period } : { type: 'unassigned', dayId: data.dayId },
+                    itemDndId(id),
+                  )
+                : 0
+            planner.updateItem(id, { ...data, order })
           } else {
-            planner.addAgendaItem(dayId, { ...data, order: appendOrder(container) })
+            const order = data.dayId
+              ? appendOrder(
+                  data.period ? { type: 'period', dayId: data.dayId, period: data.period } : { type: 'unassigned', dayId: data.dayId },
+                )
+              : 0
+            planner.addItem({ ...data, order })
           }
         }}
-        onDeleteAgenda={planner.deleteAgendaItem}
-        onSaveBacklog={(id, data) => planner.updateBacklogItem(id, data)}
-        onDeleteBacklog={planner.deleteBacklogItem}
-        onUnallocate={planner.unallocate}
-        onReallocate={(id, dayId, period) => {
-          const order = appendOrder({ type: 'period', dayId, period }, backlogAllocDndId(id))
-          planner.allocate(id, dayId, period, order)
-        }}
+        onDelete={planner.deleteItem}
       />
     </DndContext>
   )

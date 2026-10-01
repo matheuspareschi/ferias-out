@@ -1,19 +1,19 @@
 import { useSortable } from '@dnd-kit/sortable'
-import { Checkbox } from '@/components/Checkbox'
+import { ItemBullet } from '@/components/ItemBullet'
 import { ACCENT_STYLES } from '@/lib/categoryStyles'
-import { agendaDndId, sortableDragStyle, usePendingDnd } from '@/lib/dnd'
-import type { AgendaItem } from '@/lib/types'
+import { itemDndId, sortableDragStyle, usePendingDnd } from '@/lib/dnd'
+import type { Item } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 interface UnscheduledPillProps {
-  item: AgendaItem
+  item: Item
   disabled?: boolean
   onToggleDone: () => void
   onOpen: () => void
 }
 
 export function UnscheduledPill({ item, disabled, onToggleDone, onOpen }: UnscheduledPillProps) {
-  const dndId = agendaDndId(item.id)
+  const dndId = itemDndId(item.id)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: dndId,
     disabled,
@@ -43,7 +43,13 @@ export function UnscheduledPill({ item, disabled, onToggleDone, onOpen }: Unsche
         isPending && 'dnd-pending',
       )}
     >
-      <Checkbox checked={item.done} onChange={onToggleDone} size="sm" />
+      <ItemBullet
+        type={item.type}
+        done={item.done}
+        migrated={Boolean(item.migratedFrom)}
+        onChange={onToggleDone}
+        size="sm"
+      />
       <span className="max-w-32 truncate">{item.title}</span>
     </div>
   )

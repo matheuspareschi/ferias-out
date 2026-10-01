@@ -1,8 +1,10 @@
-import { Cloud, CloudOff, Moon, RefreshCw, Sun } from 'lucide-react'
+import { Cloud, CloudOff, Download, Moon, RefreshCw, Sun, Upload } from 'lucide-react'
+import { useRef, type ChangeEvent } from 'react'
 import { DayTrail } from '@/components/DayTrail'
 import { PlannerBoard } from '@/components/planner/PlannerBoard'
 import { usePlanner } from '@/hooks/usePlanner'
 import { useTheme } from '@/hooks/useTheme'
+import { todayId } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 
 function SyncIndicator({ status }: { status: ReturnType<typeof usePlanner>['syncStatus'] }) {
@@ -28,9 +30,36 @@ function SyncIndicator({ status }: { status: ReturnType<typeof usePlanner>['sync
   )
 }
 
+const headerButtonClass =
+  'flex items-center gap-1.5 rounded-sm border border-line px-2 py-1.5 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink'
+
 export default function App() {
   const planner = usePlanner()
   const { theme, toggle } = useTheme()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function handleExport() {
+    const json = JSON.stringify(planner.exportState(), null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `roteiro-backup-${todayId()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function handleImportFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const ok = planner.importState(String(reader.result))
+      if (!ok) window.alert('Não consegui ler esse arquivo — confira se é um backup exportado daqui mesmo.')
+    }
+    reader.readAsText(file)
+  }
 
   return (
     <div className="flex h-dvh flex-col bg-paper text-ink">
@@ -44,12 +73,28 @@ export default function App() {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <SyncIndicator status={planner.syncStatus} />
+          <button type="button" onClick={handleExport} className={headerButtonClass} title="Exportar backup (.json)">
+            <Download className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className={headerButtonClass}
+            title="Importar backup (.json)"
+          >
+            <Upload className="size-3.5" />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json"
+            onChange={handleImportFile}
+            className="hidden"
+          />
           <button
             type="button"
             onClick={toggle}
-            className={cn(
-              'flex items-center gap-1.5 rounded-sm border border-line px-2 py-1.5 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink',
-            )}
+            className={cn(headerButtonClass)}
             aria-label={theme === 'dark' ? 'Mudar para modo claro' : 'Mudar para modo escuro'}
             title={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
           >

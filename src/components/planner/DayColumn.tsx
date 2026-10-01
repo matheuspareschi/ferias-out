@@ -1,9 +1,9 @@
-import { Plus } from 'lucide-react'
-import { CATEGORY_ACCENT } from '@/lib/categoryStyles'
+import { NotebookPen, Plus } from 'lucide-react'
+import { useState } from 'react'
 import { WEEKDAY_LONG, dayLabel, formatDayShort, isPastDay } from '@/lib/days'
-import { agendaDndId, backlogAllocDndId, periodContainerId } from '@/lib/dnd'
+import { itemDndId, periodContainerId } from '@/lib/dnd'
 import { PERIOD_LABEL, PERIOD_ORDER } from '@/lib/periods'
-import type { AgendaItem, BacklogItem, DayCategoryId, PeriodId } from '@/lib/types'
+import type { DayCategoryId, DayMeta, Item, PeriodId } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { DayCategoryTag } from './DayCategoryTag'
 import { HabitStrip } from './HabitStrip'
@@ -15,49 +15,40 @@ interface DayColumnProps {
   dayId: string
   weekday: string
   isAnchor: boolean
-  agendaItems: AgendaItem[]
-  allocatedBacklogItems: BacklogItem[]
-  category: DayCategoryId | null
+  /** Já filtrados pra este dia (dayId === este dia). */
+  items: Item[]
+  meta: DayMeta
   onSetCategory: (dayId: string, category: DayCategoryId | null) => void
+  onSetNote: (dayId: string, note: string) => void
   onToggleDone: (id: string) => void
-  onOpenAgenda: (item: AgendaItem) => void
-  onOpenBacklog: (item: BacklogItem) => void
-  onAddAgenda: (dayId: string) => void
+  onOpenItem: (item: Item) => void
+  onAddItem: (dayId: string) => void
 }
-
-type PeriodEntry =
-  | { kind: 'agenda'; item: AgendaItem; order: number }
-  | { kind: 'backlog'; item: BacklogItem; order: number }
 
 export function DayColumn({
   dayId,
   weekday,
   isAnchor,
-  agendaItems,
-  allocatedBacklogItems,
-  category,
+  items,
+  meta,
   onSetCategory,
+  onSetNote,
   onToggleDone,
-  onOpenAgenda,
-  onOpenBacklog,
-  onAddAgenda,
+  onOpenItem,
+  onAddItem,
 }: DayColumnProps) {
   // Dias passados continuam editáveis — só ganham uma marcação informativa no cabeçalho.
   const isPast = isPastDay(dayId)
-  const habitItems = agendaItems.filter((it) => it.habit)
-  const otherItems = agendaItems.filter((it) => !it.habit)
+  const [noteOpen, setNoteOpen] = useState(false)
+  const habitItems = items.filter((it) => it.habit)
+  const otherItems = items.filter((it) => !it.habit)
   const unassigned = otherItems.filter((it) => !it.period)
   const label = dayLabel(dayId)
 
-  function periodEntries(period: PeriodId): PeriodEntry[] {
-    const entries: PeriodEntry[] = []
-    for (const it of agendaItems) {
-      if (it.period === period) entries.push({ kind: 'agenda', item: it, order: it.order })
-    }
-    for (const it of allocatedBacklogItems) {
-      if (it.allocation?.period === period) entries.push({ kind: 'backlog', item: it, order: it.allocation.order })
-    }
-    return entries.sort((a, b) => a.order - b.order)
+  // Um hábito com período aparece duas vezes de propósito: sempre na HabitStrip,
+  // e também como card aqui dentro — por isso usa `items` (não `otherItems`).
+  function periodEntries(period: PeriodId): Item[] {
+    return items.filter((it) => it.period === period).sort((a, b) => a.order - b.order)
   }
 
   return (
@@ -73,7 +64,7 @@ export function DayColumn({
             <p className="truncate font-serif text-sm font-semibold capitalize leading-tight">
               {WEEKDAY_LONG[weekday] ?? weekday}
             </p>
-            <DayCategoryTag value={category} onChange={(v) => onSetCategory(dayId, v)} />
+            <DayCategoryTag value={meta.category ?? null} onChange={(v) => onSetCategory(dayId, v)} />
           </div>
           <p className="font-mono text-xs text-ink-dim">
             {formatDayShort(dayId)}
@@ -81,21 +72,48 @@ export function DayColumn({
             {isPast ? ' · passado' : ''}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => onAddAgenda(dayId)}
-          className="shrink-0 rounded-sm p-1 text-ink-dim transition-colors hover:bg-paper-raised hover:text-ink"
-          aria-label="Adicionar tarefa"
-          title="Adicionar tarefa"
-        >
-          <Plus className="size-3.5" />
-        </button>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setNoteOpen((v) => !v)}
+            className={cn(
+              'rounded-sm p-1 transition-colors hover:bg-paper-raised hover:text-ink',
+              meta.note ? 'text-clay' : 'text-ink-faint',
+            )}
+            aria-label="Nota do dia"
+            aria-pressed={noteOpen}
+            title="Nota do dia"
+          >
+            <NotebookPen className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onAddItem(dayId)}
+            className="rounded-sm p-1 text-ink-dim transition-colors hover:bg-paper-raised hover:text-ink"
+            aria-label="Adicionar item"
+            title="Adicionar item"
+          >
+            <Plus className="size-3.5" />
+          </button>
+        </div>
       </div>
+
+      {noteOpen && (
+        <div className="border-b border-line px-2.5 py-2">
+          <textarea
+            value={meta.note ?? ''}
+            onChange={(e) => onSetNote(dayId, e.target.value)}
+            placeholder="Nota livre do dia — não entra no fluxo de tarefas…"
+            rows={3}
+            className="w-full resize-none rounded-sm border border-line bg-paper px-2 py-1.5 font-serif text-xs italic text-ink-dim outline-none focus:border-clay-dim"
+          />
+        </div>
+      )}
 
       <HabitStrip items={habitItems} onToggle={onToggleDone} />
 
       <div className="px-2 pt-2">
-        <UnscheduledList dayId={dayId} items={unassigned} onToggleDone={onToggleDone} onOpen={onOpenAgenda} />
+        <UnscheduledList dayId={dayId} items={unassigned} onToggleDone={onToggleDone} onOpen={onOpenItem} />
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pb-3 pt-2">
@@ -107,35 +125,23 @@ export function DayColumn({
                 key={period}
                 id={periodContainerId(dayId, period)}
                 label={PERIOD_LABEL[period]}
-                itemIds={entries.map((e) =>
-                  e.kind === 'agenda' ? agendaDndId(e.item.id) : backlogAllocDndId(e.item.id),
-                )}
+                itemIds={entries.map((it) => itemDndId(it.id))}
               >
-                {entries.map((entry) =>
-                  entry.kind === 'agenda' ? (
-                    <TaskCard
-                      key={entry.item.id}
-                      dndId={agendaDndId(entry.item.id)}
-                      title={entry.item.title}
-                      done={entry.item.done}
-                      kind={entry.item.color ?? 'clay'}
-                      timeNote={entry.item.timeNote}
-                      onToggleDone={() => onToggleDone(entry.item.id)}
-                      onOpen={() => onOpenAgenda(entry.item)}
-                    />
-                  ) : (
-                    <TaskCard
-                      key={entry.item.id}
-                      dndId={backlogAllocDndId(entry.item.id)}
-                      title={entry.item.title}
-                      done={entry.item.done}
-                      kind={CATEGORY_ACCENT[entry.item.category]}
-                      badge={entry.item.size}
-                      onToggleDone={() => onToggleDone(entry.item.id)}
-                      onOpen={() => onOpenBacklog(entry.item)}
-                    />
-                  ),
-                )}
+                {entries.map((item) => (
+                  <TaskCard
+                    key={item.id}
+                    dndId={itemDndId(item.id)}
+                    type={item.type}
+                    title={item.title}
+                    done={item.done}
+                    kind={item.color ?? 'clay'}
+                    badge={item.size}
+                    timeNote={item.timeNote}
+                    migrated={Boolean(item.migratedFrom)}
+                    onToggleDone={() => onToggleDone(item.id)}
+                    onOpen={() => onOpenItem(item)}
+                  />
+                ))}
               </PeriodSection>
             )
           })}

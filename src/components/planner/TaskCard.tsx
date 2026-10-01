@@ -1,30 +1,34 @@
 import { useSortable } from '@dnd-kit/sortable'
-import { Checkbox } from '@/components/Checkbox'
+import { ItemBullet } from '@/components/ItemBullet'
 import { ACCENT_STYLES } from '@/lib/categoryStyles'
 import { sortableDragStyle, usePendingDnd } from '@/lib/dnd'
-import type { AccentColor } from '@/lib/types'
+import type { AccentColor, ItemType } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 interface TaskCardProps {
   dndId: string
+  type: ItemType
   title: string
   done: boolean
   kind: AccentColor
   badge?: string
   timeNote?: string
+  migrated?: boolean
   disabled?: boolean
   onToggleDone: () => void
   onOpen: () => void
 }
 
-/** Card padronizado — mesma altura e layout pra qualquer tarefa, independente do tamanho P/M/G. */
+/** Card padronizado — mesma altura e layout pra qualquer item, independente do tamanho P/M/G. */
 export function TaskCard({
   dndId,
+  type,
   title,
   done,
   kind,
   badge,
   timeNote,
+  migrated,
   disabled,
   onToggleDone,
   onOpen,
@@ -61,7 +65,7 @@ export function TaskCard({
         isPending && 'dnd-pending',
       )}
     >
-      <Checkbox checked={done} onChange={onToggleDone} />
+      <ItemBullet type={type} done={done} migrated={migrated} onChange={onToggleDone} />
       <div className="min-w-0 flex-1">
         <p
           className={cn(
