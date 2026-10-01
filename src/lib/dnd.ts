@@ -50,42 +50,34 @@ export function draggableDragStyle(
 
 /**
  * Esquema de ids de arraste (dnd-kit). Cada draggable montado precisa de um id
- * único DENTRO do DndContext — um AgendaItem "hábito" pode estar montado ao
- * mesmo tempo na HabitStrip (sempre visível) e como card num período (quando
- * tem período), e um BacklogItem alocado fica montado tanto no card da
- * sidebar quanto no card do período. Por isso cada "papel" tem seu próprio
- * prefixo, mesmo quando aponta para o mesmo registro de dados.
+ * único DENTRO do DndContext. Um Item normal mora OU no backlog OU numa data
+ * (nunca os dois ao mesmo tempo), então um único id (`item:`) já basta. Um
+ * hábito é a exceção: fica sempre visível na HabitStrip do dia e, se também
+ * tiver período, aparece de novo como card dentro do período — a mesma
+ * entidade, montada duas vezes ao mesmo tempo — por isso a HabitStrip usa seu
+ * próprio prefixo (`habit:`) pra não colidir com o `item:` da renderização
+ * dentro do período.
  */
-export type DndKind = 'agenda' | 'backlog'
+export type DndKind = 'item' | 'habit'
 
 const PREFIX_KIND: Record<string, DndKind> = {
-  agenda: 'agenda',
-  habit: 'agenda',
-  backlog: 'backlog',
-  'backlog-alloc': 'backlog',
+  item: 'item',
+  habit: 'habit',
 }
 
-export function agendaDndId(id: string): string {
-  return `agenda:${id}`
+export function itemDndId(id: string): string {
+  return `item:${id}`
 }
 
 export function habitDndId(id: string): string {
   return `habit:${id}`
 }
 
-export function backlogCardDndId(id: string): string {
-  return `backlog:${id}`
-}
-
-export function backlogAllocDndId(id: string): string {
-  return `backlog-alloc:${id}`
-}
-
 export function splitDndId(dndId: string): { kind: DndKind; id: string } {
   const sep = dndId.indexOf(':')
   const prefix = dndId.slice(0, sep)
   const id = dndId.slice(sep + 1)
-  return { kind: PREFIX_KIND[prefix] ?? 'agenda', id }
+  return { kind: PREFIX_KIND[prefix] ?? 'item', id }
 }
 
 export const SIDEBAR_CONTAINER_ID = 'sidebar'

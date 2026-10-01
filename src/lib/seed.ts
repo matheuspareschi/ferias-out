@@ -1,4 +1,5 @@
-import type { AgendaItem, BacklogItem, HabitId, PeriodId } from './types'
+import { DEFAULT_CONTEXT_ID } from './contexts'
+import type { HabitId, Item, ItemSize, PeriodId } from './types'
 
 let seq = 0
 function nextId(prefix: string): string {
@@ -14,17 +15,20 @@ function nextOrder(dayId: string, period: PeriodId | null): number {
   return n
 }
 
+/** Compromisso preso a um dia — sem ser hábito, é o mais próximo de um "evento". */
 function agenda(
   dayId: string,
   title: string,
   period: PeriodId | null = null,
   timeNote?: string,
   habit?: HabitId,
-): AgendaItem {
+): Item {
   return {
     id: nextId('agenda'),
-    dayId,
+    type: habit ? 'task' : 'event',
     title,
+    context: DEFAULT_CONTEXT_ID,
+    dayId,
     period,
     order: nextOrder(dayId, period),
     timeNote,
@@ -34,7 +38,7 @@ function agenda(
 }
 
 /** Rotina-base completa: dias de semana comuns e Retiro. Sem período até o usuário arrastar. */
-function rotinaCompleta(dayId: string): AgendaItem[] {
+function rotinaCompleta(dayId: string): Item[] {
   return [
     agenda(dayId, 'Devocional', null, undefined, 'devocional'),
     agenda(dayId, 'Alongamento', null, undefined, 'alongamento'),
@@ -45,7 +49,7 @@ function rotinaCompleta(dayId: string): AgendaItem[] {
 }
 
 /** Rotina de sábado comum: igual à completa, sem revisão da faculdade. */
-function rotinaSabado(dayId: string): AgendaItem[] {
+function rotinaSabado(dayId: string): Item[] {
   return [
     agenda(dayId, 'Devocional', null, undefined, 'devocional'),
     agenda(dayId, 'Alongamento', null, undefined, 'alongamento'),
@@ -55,7 +59,7 @@ function rotinaSabado(dayId: string): AgendaItem[] {
 }
 
 /** Rotina reduzida de dia de viagem: só devocional + alongamento (+ leitura, opcional). */
-function rotinaViagem(dayId: string, comLeitura = false): AgendaItem[] {
+function rotinaViagem(dayId: string, comLeitura = false): Item[] {
   const base = [
     agenda(dayId, 'Devocional', null, undefined, 'devocional'),
     agenda(dayId, 'Alongamento', null, undefined, 'alongamento'),
@@ -64,7 +68,7 @@ function rotinaViagem(dayId: string, comLeitura = false): AgendaItem[] {
   return base
 }
 
-export function buildSeedAgendaItems(): AgendaItem[] {
+function agendaItems(): Item[] {
   return [
     // 24/09 (qui) — dia de semana normal
     ...rotinaCompleta('2026-09-24'),
@@ -164,23 +168,24 @@ export function buildSeedAgendaItems(): AgendaItem[] {
   ]
 }
 
-function backlog(
-  title: string,
-  category: BacklogItem['category'],
-  size: BacklogItem['size'],
-): BacklogItem {
-  return { id: nextId('backlog'), title, category, size, done: false }
+function backlog(title: string, context: string, size: ItemSize): Item {
+  return { id: nextId('backlog'), type: 'task', title, context, size, order: 0, done: false }
 }
 
-export function buildSeedBacklogItems(): BacklogItem[] {
+function backlogItems(): Item[] {
   return [
-    backlog('Aula — a definir 1', 'aula', 'M'),
-    backlog('Aula — a definir 2', 'aula', 'M'),
-    backlog('Aula — a definir 3', 'aula', 'M'),
-    backlog('Preparo de aula do JVJ', 'preparo', 'M'),
-    backlog('Preparo de Estudo Bíblico', 'preparo', 'M'),
-    backlog('Preparo de Estudo Bíblico', 'preparo', 'M'),
-    backlog('Preparo de aula para o GAEB', 'preparo', 'M'),
-    backlog('Lavar o carro', 'tarefa', 'P'),
+    backlog('Aula — a definir 1', 'faculdade', 'M'),
+    backlog('Aula — a definir 2', 'faculdade', 'M'),
+    backlog('Aula — a definir 3', 'faculdade', 'M'),
+    backlog('Preparo de aula do JVJ', DEFAULT_CONTEXT_ID, 'M'),
+    backlog('Preparo de Estudo Bíblico', DEFAULT_CONTEXT_ID, 'M'),
+    backlog('Preparo de Estudo Bíblico', DEFAULT_CONTEXT_ID, 'M'),
+    backlog('Preparo de aula para o GAEB', 'gaeb', 'M'),
+    backlog('Lavar o carro', DEFAULT_CONTEXT_ID, 'P'),
   ]
+}
+
+/** Dados de um instalação nova (sem localStorage/Supabase ainda) — o roteiro original da viagem. */
+export function buildSeedItems(): Item[] {
+  return [...agendaItems(), ...backlogItems()]
 }

@@ -1,148 +1,78 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { DEFAULT_CONTEXT_ID, DEFAULT_CONTEXTS } from '@/lib/contexts'
 import { defaultAnchorDayId } from '@/lib/days'
-import { buildSeedAgendaItems, buildSeedBacklogItems } from '@/lib/seed'
+import { needsV0Migration, normalizeState, type PlannerState } from '@/lib/migrations'
+import { buildSeedItems } from '@/lib/seed'
 import { SYNC_ENABLED, supabase } from '@/lib/supabaseClient'
-import type { AgendaItem, BacklogItem, DayCategoryId, HabitId, PeriodId } from '@/lib/types'
+import type { Context, DayCategoryId, HabitId, Item } from '@/lib/types'
 
 const STORAGE_KEY = 'ferias-planner:v1'
+const BACKUP_KEY = 'ferias-planner:backup:pre-v1'
 const SYNC_TABLE = 'planner_state'
 const SYNC_ROW_ID = 'default'
 
-interface PlannerState {
-  agendaItems: AgendaItem[]
-  backlogItems: BacklogItem[]
-  anchorDayId: string
-  dayCategories: Record<string, DayCategoryId>
-}
-
 export type SyncStatus = 'disabled' | 'syncing' | 'synced' | 'error'
 
-/** Rotina-base gravada antes da HabitStrip existir não tinha o campo `habit`. */
-const HABIT_TITLE_TO_ID: Record<string, HabitId> = {
-  Devocional: 'devocional',
-  Alongamento: 'alongamento',
-  Leitura: 'leitura',
-  Exercício: 'exercicio',
-  'Revisão da faculdade': 'revisao',
+const HABIT_ORDER: HabitId[] = ['devocional', 'alongamento', 'leitura', 'exercicio', 'revisao']
+const HABIT_TITLE: Record<HabitId, string> = {
+  devocional: 'Devocional',
+  alongamento: 'Alongamento',
+  leitura: 'Leitura',
+  exercicio: 'Exercício',
+  revisao: 'Revisão da faculdade',
 }
 
-function periodForHour(hour: number): PeriodId {
-  if (hour < 12) return 'manha'
-  if (hour < 18) return 'tarde'
-  return 'noite'
+function newId(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-function pad2(n: number): string {
-  return String(n).padStart(2, '0')
+function slugify(label: string): string {
+  return label
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
 }
 
-/** Dados como eram salvos antes da troca de horário/duração por período. */
-interface LegacyAgendaItem extends Partial<AgendaItem> {
-  id: string
-  dayId: string
-  title: string
-  start?: string | null
-  duration?: number | null
-}
-
-interface LegacyAllocation {
-  dayId: string
-  period?: PeriodId
-  order?: number
-  start?: string
-  duration?: number
-}
-
-interface LegacyBacklogItem extends Omit<BacklogItem, 'allocation'> {
-  allocation?: LegacyAllocation
-}
-
-function migrateAgendaItems(rawItems: LegacyAgendaItem[]): AgendaItem[] {
-  const orderCounters = new Map<string, number>()
-  function nextOrder(dayId: string, period: PeriodId | null): number {
-    const key = `${dayId}:${period ?? 'none'}`
-    const n = orderCounters.get(key) ?? 0
-    orderCounters.set(key, n + 1)
-    return n
-  }
-
-  return rawItems.map((raw) => {
-    const habit = raw.habit ?? HABIT_TITLE_TO_ID[raw.title]
-    let period: PeriodId | null = raw.period ?? null
-    let timeNote = raw.timeNote
-
-    if (raw.period === undefined && raw.start) {
-      const [h, m] = raw.start.split(':').map(Number)
-      period = periodForHour(h)
-      if (raw.duration) {
-        const endMinutes = h * 60 + m + raw.duration
-        const end = `${pad2(Math.floor(endMinutes / 60) % 24)}:${pad2(endMinutes % 60)}`
-        timeNote = end === raw.start ? raw.start : `${raw.start}–${end}`
-      } else {
-        timeNote = raw.start
-      }
+/** Guarda uma cópia do blob v0 antes de migrar — só uma vez, nunca sobrescreve. */
+function backupLegacyBlobIfNeeded(raw: string) {
+  try {
+    if (!window.localStorage.getItem(BACKUP_KEY)) {
+      window.localStorage.setItem(BACKUP_KEY, raw)
     }
-
-    const order = raw.order ?? nextOrder(raw.dayId, period)
-
-    return {
-      id: raw.id,
-      dayId: raw.dayId,
-      title: raw.title,
-      period,
-      order,
-      timeNote,
-      done: raw.done ?? false,
-      habit,
-      color: raw.color,
-    }
-  })
+  } catch {
+    // localStorage indisponível — segue sem backup local (o export manual ainda cobre isso)
+  }
 }
 
-function migrateBacklogItems(rawItems: LegacyBacklogItem[]): BacklogItem[] {
-  const orderCounters = new Map<string, number>()
-  function nextOrder(dayId: string, period: PeriodId): number {
-    const key = `${dayId}:${period}`
-    const n = orderCounters.get(key) ?? 0
-    orderCounters.set(key, n + 1)
-    return n
-  }
-
-  return rawItems.map((raw) => {
-    const legacyAlloc = raw.allocation
-    if (!legacyAlloc) return { ...raw, allocation: undefined }
-
-    let period = legacyAlloc.period
-    if (!period && legacyAlloc.start) {
-      const [h] = legacyAlloc.start.split(':').map(Number)
-      period = periodForHour(h)
-    }
-    if (!period) return { ...raw, allocation: undefined }
-
-    const order = legacyAlloc.order ?? nextOrder(legacyAlloc.dayId, period)
-    return { ...raw, allocation: { dayId: legacyAlloc.dayId, period, order } }
-  })
-}
-
-/** Normaliza um blob salvo (localStorage ou Supabase), migrando campos antigos. */
-function normalizeState(parsed: Partial<PlannerState>): PlannerState | null {
-  if (!Array.isArray(parsed.agendaItems) || !Array.isArray(parsed.backlogItems) || !parsed.anchorDayId) {
-    return null
-  }
-  return {
-    agendaItems: migrateAgendaItems(parsed.agendaItems as LegacyAgendaItem[]),
-    backlogItems: migrateBacklogItems(parsed.backlogItems as LegacyBacklogItem[]),
-    anchorDayId: parsed.anchorDayId,
-    dayCategories: parsed.dayCategories ?? {},
-  }
+/** Garante que `dayId` tenha os itens de hábito da rotina-base, sem duplicar. */
+function ensureDailyHabits(items: Item[], dayId: string): Item[] {
+  const existing = new Set(items.filter((it) => it.dayId === dayId && it.habit).map((it) => it.habit))
+  const missing = HABIT_ORDER.filter((h) => !existing.has(h))
+  if (missing.length === 0) return items
+  const created: Item[] = missing.map((habit) => ({
+    id: newId('item'),
+    type: 'task',
+    title: HABIT_TITLE[habit],
+    context: DEFAULT_CONTEXT_ID,
+    dayId,
+    period: null,
+    order: 0,
+    done: false,
+    habit,
+  }))
+  return [...items, ...created]
 }
 
 function seedState(): PlannerState {
   return {
-    agendaItems: buildSeedAgendaItems(),
-    backlogItems: buildSeedBacklogItems(),
+    schemaVersion: 1,
+    items: ensureDailyHabits(buildSeedItems(), defaultAnchorDayId()),
+    contexts: DEFAULT_CONTEXTS,
+    dayMeta: {},
     anchorDayId: defaultAnchorDayId(),
-    dayCategories: {},
   }
 }
 
@@ -155,17 +85,15 @@ function loadState(): PlannerState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (raw) {
-      const normalized = normalizeState(JSON.parse(raw))
+      const parsed = JSON.parse(raw)
+      if (needsV0Migration(parsed)) backupLegacyBlobIfNeeded(raw)
+      const normalized = normalizeState(parsed)
       if (normalized) return withTodayAnchor(normalized)
     }
   } catch {
     // localStorage indisponível ou dados corrompidos — cai para o seed
   }
   return seedState()
-}
-
-function newId(prefix: string): string {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
 export function usePlanner() {
@@ -185,6 +113,16 @@ export function usePlanner() {
       // storage indisponível/cheio — segue só em memória
     }
   }, [state])
+
+  // Garante os hábitos do dia sempre que a âncora muda (inclusive no primeiro
+  // load, já que ela começa em hoje) — idempotente: se nada falta, devolve a
+  // mesma referência de `items` e o React não re-renderiza à toa.
+  useEffect(() => {
+    setState((s) => {
+      const items = ensureDailyHabits(s.items, s.anchorDayId)
+      return items === s.items ? s : { ...s, items }
+    })
+  }, [state.anchorDayId])
 
   // Sobe pro Supabase toda mudança LOCAL (ignora mudanças que vieram de lá mesmo).
   useEffect(() => {
@@ -224,7 +162,8 @@ export function usePlanner() {
           hasHydrated.current = true
           return
         }
-        const remote = data?.data ? normalizeState(data.data as Partial<PlannerState>) : null
+        if (needsV0Migration(data?.data)) backupLegacyBlobIfNeeded(JSON.stringify(data?.data))
+        const remote = data?.data ? normalizeState(data.data) : null
         if (remote) {
           isRemoteUpdate.current = true
           setState(withTodayAnchor(remote))
@@ -243,7 +182,7 @@ export function usePlanner() {
         { event: '*', schema: 'public', table: SYNC_TABLE, filter: `id=eq.${SYNC_ROW_ID}` },
         (payload) => {
           const incoming = payload.new as { data?: unknown } | undefined
-          const remote = incoming?.data ? normalizeState(incoming.data as Partial<PlannerState>) : null
+          const remote = incoming?.data ? normalizeState(incoming.data) : null
           if (remote) {
             isRemoteUpdate.current = true
             // Mantém o dia que a pessoa está vendo — não pula pro dia que estava
@@ -262,96 +201,61 @@ export function usePlanner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const addAgendaItem = useCallback(
+  const addItem = useCallback(
     (
-      dayId: string,
-      data: Partial<Pick<AgendaItem, 'title' | 'period' | 'order' | 'timeNote' | 'color'>> = {},
+      data: Pick<Item, 'type' | 'title'> &
+        Partial<
+          Pick<
+            Item,
+            | 'context'
+            | 'size'
+            | 'dayId'
+            | 'period'
+            | 'order'
+            | 'timeNote'
+            | 'color'
+            | 'referenceMonth'
+            | 'subitems'
+          >
+        >,
     ) => {
-      const item: AgendaItem = {
-        id: newId('agenda'),
-        dayId,
-        title: data.title?.trim() || 'Novo compromisso',
+      const item: Item = {
+        id: newId('item'),
+        type: data.type,
+        title: data.title.trim() || (data.type === 'event' ? 'Novo evento' : 'Nova tarefa'),
+        context: data.context ?? DEFAULT_CONTEXT_ID,
+        size: data.size,
+        dayId: data.dayId,
         period: data.period ?? null,
         order: data.order ?? 0,
         timeNote: data.timeNote,
         color: data.color,
+        referenceMonth: data.referenceMonth,
+        subitems: data.subitems,
         done: false,
       }
-      setState((s) => ({ ...s, agendaItems: [...s.agendaItems, item] }))
+      setState((s) => ({ ...s, items: [...s.items, item] }))
       return item.id
     },
     [],
   )
 
-  const updateAgendaItem = useCallback((id: string, patch: Partial<AgendaItem>) => {
+  const updateItem = useCallback((id: string, patch: Partial<Item>) => {
     setState((s) => ({
       ...s,
-      agendaItems: s.agendaItems.map((it) => (it.id === id ? { ...it, ...patch } : it)),
+      items: s.items.map((it) => (it.id === id ? { ...it, ...patch } : it)),
     }))
   }, [])
 
-  const deleteAgendaItem = useCallback((id: string) => {
-    setState((s) => ({ ...s, agendaItems: s.agendaItems.filter((it) => it.id !== id) }))
+  const deleteItem = useCallback((id: string) => {
+    setState((s) => ({ ...s, items: s.items.filter((it) => it.id !== id) }))
   }, [])
 
-  const addBacklogItem = useCallback((data: Pick<BacklogItem, 'title' | 'category' | 'size'>) => {
-    const item: BacklogItem = {
-      id: newId('backlog'),
-      done: false,
-      title: data.title.trim(),
-      category: data.category,
-      size: data.size,
-    }
-    setState((s) => ({ ...s, backlogItems: [...s.backlogItems, item] }))
-    return item.id
-  }, [])
-
-  const updateBacklogItem = useCallback((id: string, patch: Partial<BacklogItem>) => {
+  const toggleDone = useCallback((id: string) => {
     setState((s) => ({
       ...s,
-      backlogItems: s.backlogItems.map((it) => (it.id === id ? { ...it, ...patch } : it)),
+      items: s.items.map((it) => (it.id === id ? { ...it, done: !it.done } : it)),
     }))
-  }, [])
-
-  const deleteBacklogItem = useCallback((id: string) => {
-    setState((s) => ({ ...s, backlogItems: s.backlogItems.filter((it) => it.id !== id) }))
-  }, [])
-
-  /** Aloca um BacklogItem num dia/período — sugestão visual, não trava o item. */
-  const allocate = useCallback((itemId: string, dayId: string, period: PeriodId, order: number) => {
-    setState((s) => ({
-      ...s,
-      backlogItems: s.backlogItems.map((it) =>
-        it.id === itemId ? { ...it, allocation: { dayId, period, order } } : it,
-      ),
-    }))
-  }, [])
-
-  const unallocate = useCallback((itemId: string) => {
-    setState((s) => ({
-      ...s,
-      backlogItems: s.backlogItems.map((it) => {
-        if (it.id !== itemId) return it
-        const next = { ...it }
-        delete next.allocation
-        return next
-      }),
-    }))
-  }, [])
-
-  const toggleDone = useCallback((itemId: string) => {
-    setState((s) => {
-      if (s.agendaItems.some((it) => it.id === itemId)) {
-        return {
-          ...s,
-          agendaItems: s.agendaItems.map((it) => (it.id === itemId ? { ...it, done: !it.done } : it)),
-        }
-      }
-      return {
-        ...s,
-        backlogItems: s.backlogItems.map((it) => (it.id === itemId ? { ...it, done: !it.done } : it)),
-      }
-    })
   }, [])
 
   const setAnchorDay = useCallback((dayId: string) => {
@@ -360,31 +264,92 @@ export function usePlanner() {
 
   const setDayCategory = useCallback((dayId: string, category: DayCategoryId | null) => {
     setState((s) => {
-      const dayCategories = { ...s.dayCategories }
-      if (category) dayCategories[dayId] = category
-      else delete dayCategories[dayId]
-      return { ...s, dayCategories }
+      const dayMeta = { ...s.dayMeta }
+      const current = dayMeta[dayId] ?? {}
+      if (category) {
+        dayMeta[dayId] = { ...current, category }
+      } else if (current.note) {
+        dayMeta[dayId] = { note: current.note }
+      } else {
+        delete dayMeta[dayId]
+      }
+      return { ...s, dayMeta }
     })
   }, [])
 
+  const setDayNote = useCallback((dayId: string, note: string) => {
+    setState((s) => {
+      const dayMeta = { ...s.dayMeta }
+      const current = dayMeta[dayId] ?? {}
+      const trimmed = note.trim()
+      if (trimmed) {
+        dayMeta[dayId] = { ...current, note: trimmed }
+      } else if (current.category) {
+        dayMeta[dayId] = { category: current.category }
+      } else {
+        delete dayMeta[dayId]
+      }
+      return { ...s, dayMeta }
+    })
+  }, [])
+
+  const addContext = useCallback((label: string): string => {
+    const trimmed = label.trim()
+    if (!trimmed) return DEFAULT_CONTEXT_ID
+    const id = slugify(trimmed) || newId('contexto')
+    setState((s) => (s.contexts.some((c) => c.id === id) ? s : { ...s, contexts: [...s.contexts, { id, label: trimmed }] }))
+    return id
+  }, [])
+
+  const renameContext = useCallback((id: string, label: string) => {
+    const trimmed = label.trim()
+    if (!trimmed) return
+    setState((s) => ({
+      ...s,
+      contexts: s.contexts.map((c) => (c.id === id ? { ...c, label: trimmed } : c)),
+    }))
+  }, [])
+
+  /** Não deixa apagar um contexto ainda em uso por algum item. */
+  const deleteContext = useCallback((id: string) => {
+    setState((s) => {
+      if (s.items.some((it) => it.context === id)) return s
+      return { ...s, contexts: s.contexts.filter((c) => c.id !== id) }
+    })
+  }, [])
+
+  const importState = useCallback((json: string): boolean => {
+    try {
+      const normalized = normalizeState(JSON.parse(json))
+      if (!normalized) return false
+      setState(withTodayAnchor(normalized))
+      return true
+    } catch {
+      return false
+    }
+  }, [])
+
   return {
-    agendaItems: state.agendaItems,
-    backlogItems: state.backlogItems,
+    items: state.items,
+    contexts: state.contexts,
+    dayMeta: state.dayMeta,
     anchorDayId: state.anchorDayId,
-    dayCategories: state.dayCategories,
     syncStatus,
-    addAgendaItem,
-    updateAgendaItem,
-    deleteAgendaItem,
-    addBacklogItem,
-    updateBacklogItem,
-    deleteBacklogItem,
-    allocate,
-    unallocate,
+    addItem,
+    updateItem,
+    deleteItem,
     toggleDone,
     setAnchorDay,
     setDayCategory,
+    setDayNote,
+    addContext,
+    renameContext,
+    deleteContext,
+    /** Estado completo, pronto pra `JSON.stringify` num botão de exportar. */
+    exportState: () => state,
+    importState,
   }
 }
 
 export type UsePlannerReturn = ReturnType<typeof usePlanner>
+export type { Context }
