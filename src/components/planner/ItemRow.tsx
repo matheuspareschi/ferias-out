@@ -81,6 +81,7 @@ export function ItemRow({
         done={item.done}
         migrated={Boolean(item.migratedFrom)}
         subtask={isSubtask}
+        delivery={item.isDelivery}
         onChange={onToggleDone}
         className={cn('mt-0.5', overdue && !item.done && 'text-attention')}
       />

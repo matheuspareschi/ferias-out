@@ -1,4 +1,4 @@
-import { X } from 'lucide-react'
+import { Star, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ItemType } from '@/lib/types'
 
@@ -9,6 +9,8 @@ interface ItemGlyphProps {
   migrated?: boolean
   /** Subtarefa: traço mais leve em vez da caixa/losango cheios. */
   subtask?: boolean
+  /** Entrega da Faculdade: símbolo ★ no lugar do símbolo de tipo (3.1). */
+  delivery?: boolean
   onChange: () => void
   size?: 'sm' | 'md'
   className?: string
@@ -18,10 +20,10 @@ interface ItemGlyphProps {
 
 /**
  * Símbolo clicável no estilo bullet journal — nunca uma caixa preenchida.
- * Prioridade de símbolo: feita (✕) > migrada (`>`) > tipo (caixa/losango),
- * com a subtarefa usando um traço mais leve no lugar da caixa.
+ * Prioridade de símbolo: feita (✕) > migrada (`>`) > subtarefa (traço) >
+ * entrega (★) > tipo (caixa/losango).
  */
-export function ItemGlyph({ type, done, migrated, subtask, onChange, size = 'sm', className, interactive = true }: ItemGlyphProps) {
+export function ItemGlyph({ type, done, migrated, subtask, delivery, onChange, size = 'sm', className, interactive = true }: ItemGlyphProps) {
   const dim = size === 'sm' ? 14 : 16
   const Tag = interactive ? 'button' : 'span'
 
@@ -53,6 +55,8 @@ export function ItemGlyph({ type, done, migrated, subtask, onChange, size = 'sm'
         </span>
       ) : subtask ? (
         <span className="block h-px w-2.5 bg-ink-faint" aria-hidden />
+      ) : delivery ? (
+        <Star size={dim - 4} strokeWidth={1.5} aria-hidden />
       ) : type === 'event' ? (
         <svg width={dim - 4} height={dim - 4} viewBox="0 0 10 10" fill="none" aria-hidden>
           <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.3" />
