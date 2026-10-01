@@ -83,7 +83,7 @@ function HabitButton({
         'relative flex size-7 select-none touch-manipulation items-center justify-center rounded-sm border transition-colors',
         !disabled && 'cursor-grab active:cursor-grabbing',
         item.done
-          ? 'border-gold-dim bg-gold-soft text-gold'
+          ? 'border-done-dim bg-done-soft text-done'
           : 'border-line text-ink-faint hover:border-line-strong hover:text-ink-dim',
         disabled && 'pointer-events-none opacity-50',
         isDragging && 'z-30 opacity-85 shadow-lifted',
@@ -92,7 +92,7 @@ function HabitButton({
     >
       <Icon className="size-3.5" />
       {item.period && !item.done && (
-        <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-clay" aria-hidden />
+        <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-ink-faint" aria-hidden />
       )}
     </button>
   )

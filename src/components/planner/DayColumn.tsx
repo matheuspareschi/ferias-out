@@ -7,8 +7,8 @@ import type { DayCategoryId, DayMeta, Item, PeriodId } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { DayCategoryTag } from './DayCategoryTag'
 import { HabitStrip } from './HabitStrip'
+import { ItemRow, type MoveAction } from './ItemRow'
 import { PeriodSection } from './PeriodSection'
-import { TaskCard } from './TaskCard'
 import { UnscheduledList } from './UnscheduledList'
 
 interface DayColumnProps {
@@ -17,12 +17,15 @@ interface DayColumnProps {
   isAnchor: boolean
   /** Já filtrados pra este dia (dayId === este dia). */
   items: Item[]
+  /** Lista completa (todos os dias) — pra achar pai/subtarefas que não moram neste dia. */
+  allItems: Item[]
   meta: DayMeta
   onSetCategory: (dayId: string, category: DayCategoryId | null) => void
   onSetNote: (dayId: string, note: string) => void
   onToggleDone: (id: string) => void
   onOpenItem: (item: Item) => void
   onAddItem: (dayId: string) => void
+  onMoveItem: (item: Item, action: MoveAction) => void
 }
 
 export function DayColumn({
@@ -30,12 +33,14 @@ export function DayColumn({
   weekday,
   isAnchor,
   items,
+  allItems,
   meta,
   onSetCategory,
   onSetNote,
   onToggleDone,
   onOpenItem,
   onAddItem,
+  onMoveItem,
 }: DayColumnProps) {
   // Dias passados continuam editáveis — só ganham uma marcação informativa no cabeçalho.
   const isPast = isPastDay(dayId)
@@ -46,16 +51,36 @@ export function DayColumn({
   const label = dayLabel(dayId)
 
   // Um hábito com período aparece duas vezes de propósito: sempre na HabitStrip,
-  // e também como card aqui dentro — por isso usa `items` (não `otherItems`).
+  // e também como linha aqui dentro — por isso usa `items` (não `otherItems`).
   function periodEntries(period: PeriodId): Item[] {
     return items.filter((it) => it.period === period).sort((a, b) => a.order - b.order)
+  }
+
+  function renderItem(item: Item) {
+    const children = allItems.filter((it) => it.parentId === item.id)
+    const progress = children.length > 0 ? { done: children.filter((c) => c.done).length, total: children.length } : undefined
+    const parent = item.parentId ? allItems.find((it) => it.id === item.parentId) : undefined
+    // Pendência (destaque de atenção, 2.3/2.8): só tarefa (não hábito), não feita, de dia passado.
+    const overdue = item.type === 'task' && !item.habit && !item.done && isPast
+    return (
+      <ItemRow
+        item={item}
+        overdue={overdue}
+        progress={progress}
+        parentTitle={parent?.title}
+        sizeSuffix={item.context === 'faculdade' ? item.size : undefined}
+        onToggleDone={() => onToggleDone(item.id)}
+        onOpen={() => onOpenItem(item)}
+        onMove={(action) => onMoveItem(item, action)}
+      />
+    )
   }
 
   return (
     <div
       className={cn(
         'flex min-w-0 flex-1 flex-col rounded-md border',
-        isAnchor ? 'border-rust/50 bg-paper-raised/50 shadow-card' : 'border-line bg-paper-raised/15',
+        isAnchor ? 'border-accent/50 bg-paper-raised/50 shadow-card' : 'border-line bg-paper-raised/15',
       )}
     >
       <div className="flex items-start justify-between gap-2 border-b border-line px-2.5 py-2">
@@ -78,7 +103,7 @@ export function DayColumn({
             onClick={() => setNoteOpen((v) => !v)}
             className={cn(
               'rounded-sm p-1 transition-colors hover:bg-paper-raised hover:text-ink',
-              meta.note ? 'text-clay' : 'text-ink-faint',
+              meta.note ? 'text-accent' : 'text-ink-faint',
             )}
             aria-label="Nota do dia"
             aria-pressed={noteOpen}
@@ -105,7 +130,7 @@ export function DayColumn({
             onChange={(e) => onSetNote(dayId, e.target.value)}
             placeholder="Nota livre do dia — não entra no fluxo de tarefas…"
             rows={3}
-            className="w-full resize-none rounded-sm border border-line bg-paper px-2 py-1.5 font-serif text-xs italic text-ink-dim outline-none focus:border-clay-dim"
+            className="w-full resize-none rounded-sm border border-line bg-paper px-2 py-1.5 font-serif text-xs italic text-ink-dim outline-none focus:border-accent"
           />
         </div>
       )}
@@ -113,11 +138,11 @@ export function DayColumn({
       <HabitStrip items={habitItems} onToggle={onToggleDone} />
 
       <div className="px-2 pt-2">
-        <UnscheduledList dayId={dayId} items={unassigned} onToggleDone={onToggleDone} onOpen={onOpenItem} />
+        <UnscheduledList dayId={dayId} items={unassigned} renderItem={renderItem} />
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pb-3 pt-2">
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col">
           {PERIOD_ORDER.map((period) => {
             const entries = periodEntries(period)
             return (
@@ -128,19 +153,7 @@ export function DayColumn({
                 itemIds={entries.map((it) => itemDndId(it.id))}
               >
                 {entries.map((item) => (
-                  <TaskCard
-                    key={item.id}
-                    dndId={itemDndId(item.id)}
-                    type={item.type}
-                    title={item.title}
-                    done={item.done}
-                    kind={item.color ?? 'clay'}
-                    badge={item.size}
-                    timeNote={item.timeNote}
-                    migrated={Boolean(item.migratedFrom)}
-                    onToggleDone={() => onToggleDone(item.id)}
-                    onOpen={() => onOpenItem(item)}
-                  />
+                  <div key={item.id}>{renderItem(item)}</div>
                 ))}
               </PeriodSection>
             )

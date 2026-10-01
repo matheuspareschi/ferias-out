@@ -11,6 +11,7 @@ interface PeriodSectionProps {
   children: ReactNode
 }
 
+/** Sem moldura própria (v2): só o rótulo do período e uma linha fina separando do anterior. */
 export function PeriodSection({ id, label, itemIds, disabled, children }: PeriodSectionProps) {
   const { setNodeRef, isOver } = useDroppable({
     id,
@@ -19,14 +20,11 @@ export function PeriodSection({ id, label, itemIds, disabled, children }: Period
   })
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1 border-t border-line pt-2 first:border-t-0 first:pt-0">
       <p className="px-0.5 font-mono text-[10px] uppercase tracking-wide text-ink-faint">{label}</p>
       <div
         ref={setNodeRef}
-        className={cn(
-          'flex min-h-11 flex-col gap-1.5 rounded-sm p-1 transition-colors',
-          isOver && !disabled && 'bg-gold-soft/40',
-        )}
+        className={cn('flex min-h-6 flex-col rounded-sm', isOver && !disabled && 'bg-accent-soft/50')}
       >
         <SortableContext id={id} items={itemIds} strategy={verticalListSortingStrategy} disabled={disabled}>
           {children}

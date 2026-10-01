@@ -1,19 +1,18 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext } from '@dnd-kit/sortable'
+import type { ReactNode } from 'react'
 import { itemDndId, unassignedContainerId } from '@/lib/dnd'
 import type { Item } from '@/lib/types'
 import { cn } from '@/lib/utils'
-import { UnscheduledPill } from './UnscheduledPill'
 
 interface UnscheduledListProps {
   dayId: string
   items: Item[]
   disabled?: boolean
-  onToggleDone: (id: string) => void
-  onOpen: (item: Item) => void
+  renderItem: (item: Item) => ReactNode
 }
 
-export function UnscheduledList({ dayId, items, disabled, onToggleDone, onOpen }: UnscheduledListProps) {
+export function UnscheduledList({ dayId, items, disabled, renderItem }: UnscheduledListProps) {
   const containerId = unassignedContainerId(dayId)
   const { setNodeRef, isOver } = useDroppable({
     id: containerId,
@@ -24,23 +23,14 @@ export function UnscheduledList({ dayId, items, disabled, onToggleDone, onOpen }
   return (
     <div
       ref={setNodeRef}
-      className={cn(
-        'flex min-h-7 flex-wrap gap-1 rounded-sm border border-dashed border-transparent p-1 transition-colors',
-        isOver && !disabled && 'border-line-strong bg-gold-soft/40',
-      )}
+      className={cn('flex min-h-6 flex-col rounded-sm', isOver && !disabled && 'bg-accent-soft/50')}
     >
       <SortableContext id={containerId} items={items.map((it) => itemDndId(it.id))}>
         {items.length === 0 && (
           <span className="px-1 py-0.5 font-mono text-[9px] text-ink-faint">sem período</span>
         )}
         {items.map((item) => (
-          <UnscheduledPill
-            key={item.id}
-            item={item}
-            disabled={disabled}
-            onToggleDone={() => onToggleDone(item.id)}
-            onOpen={() => onOpen(item)}
-          />
+          <div key={item.id}>{renderItem(item)}</div>
         ))}
       </SortableContext>
     </div>
