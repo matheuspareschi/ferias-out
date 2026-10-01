@@ -2,106 +2,89 @@
 
 @import 'tailwindcss';
 
+/*
+ * Paleta clara e fria (v2 da especificação) — substitui o tom amarelado de
+ * caderno antigo. Nomes de token mantidos (paper/ink/line...) pra não exigir
+ * reescrever toda referência; só os valores e os tons de destaque mudam.
+ * Só 3 famílias de acento: accent (ação/seleção), done (concluído/hábito) e
+ * attention (atenção/pendência/destrutivo) — sem cor por item ou contexto.
+ */
 @theme {
   --font-serif: 'Spectral', 'Iowan Old Style', Georgia, serif;
   --font-sans: 'Work Sans', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  --color-paper: #f2ead9;
-  --color-paper-dim: #e9dfc9;
-  --color-paper-raised: #faf5e9;
-  --color-ink: #2b2318;
-  --color-ink-dim: #6b6153;
-  --color-ink-faint: #9b9080;
-  --color-line: #d8caa8;
-  --color-line-strong: #b7a578;
+  --color-paper: #f6f8fa;
+  --color-paper-dim: #eaeef2;
+  --color-paper-raised: #ffffff;
+  --color-ink: #1f2328;
+  --color-ink-dim: #59636e;
+  --color-ink-faint: #8b949e;
+  --color-line: #d8dee4;
+  --color-line-strong: #afb8c1;
 
-  --color-rust: #a8481f;
-  --color-rust-dim: #b8582e;
-  --color-rust-soft: #f2c8a3;
+  --color-accent: #2f6feb;
+  --color-accent-dim: #1958d9;
+  --color-accent-soft: #dbeafe;
 
-  --color-olive: #5d6b3d;
-  --color-olive-dim: #6f7f47;
-  --color-olive-soft: #cfdba0;
+  --color-done: #2da44e;
+  --color-done-dim: #22863a;
+  --color-done-soft: #dafbe1;
 
-  --color-gold: #9c7422;
-  --color-gold-dim: #a37f2e;
-  --color-gold-soft: #f2d571;
+  --color-attention: #cf7b00;
+  --color-attention-dim: #9a5a00;
+  --color-attention-soft: #fff1d6;
 
-  --color-clay: #6b4030;
-  --color-clay-dim: #8a5a44;
-  --color-clay-soft: #e0b696;
-
-  --color-slate: #3d5a73;
-  --color-slate-dim: #4f708c;
-  --color-slate-soft: #bcd1de;
-
-  --shadow-card: 0 1px 0 rgba(43, 35, 24, 0.06), 0 2px 6px rgba(43, 35, 24, 0.08);
-  --shadow-lifted: 0 8px 24px rgba(43, 35, 24, 0.18);
+  --shadow-card: 0 1px 0 rgba(31, 35, 40, 0.04), 0 2px 6px rgba(31, 35, 40, 0.06);
+  --shadow-lifted: 0 8px 24px rgba(31, 35, 40, 0.16);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --color-paper: #1d1811;
-    --color-paper-dim: #171310;
-    --color-paper-raised: #26201a;
-    --color-ink: #ecdfc8;
-    --color-ink-dim: #b3a58a;
-    --color-ink-faint: #7c715c;
-    --color-line: #3c3324;
-    --color-line-strong: #55492f;
+    --color-paper: #0d1117;
+    --color-paper-dim: #0a0d12;
+    --color-paper-raised: #161b22;
+    --color-ink: #e6edf3;
+    --color-ink-dim: #9ba7b4;
+    --color-ink-faint: #6e7781;
+    --color-line: #30363d;
+    --color-line-strong: #484f58;
 
-    --color-rust: #e08f5c;
-    --color-rust-dim: #c17040;
-    --color-rust-soft: #5c3320;
+    --color-accent: #58a6ff;
+    --color-accent-dim: #388bfd;
+    --color-accent-soft: #132a4d;
 
-    --color-olive: #b0c085;
-    --color-olive-dim: #8fa066;
-    --color-olive-soft: #3d4526;
+    --color-done: #3fb950;
+    --color-done-dim: #2ea043;
+    --color-done-soft: #122d1b;
 
-    --color-gold: #e2c077;
-    --color-gold-dim: #c9a355;
-    --color-gold-soft: #4a3a18;
-
-    --color-clay: #cf9a7d;
-    --color-clay-dim: #b8846a;
-    --color-clay-soft: #4a3226;
-
-    --color-slate: #8fb2c9;
-    --color-slate-dim: #6f96b2;
-    --color-slate-soft: #263c4a;
+    --color-attention: #d29922;
+    --color-attention-dim: #9e6a03;
+    --color-attention-soft: #3b2900;
   }
 }
 
 :root[data-theme='dark'] {
-  --color-paper: #1d1811;
-  --color-paper-dim: #171310;
-  --color-paper-raised: #26201a;
-  --color-ink: #ecdfc8;
-  --color-ink-dim: #b3a58a;
-  --color-ink-faint: #7c715c;
-  --color-line: #3c3324;
-  --color-line-strong: #55492f;
+  --color-paper: #0d1117;
+  --color-paper-dim: #0a0d12;
+  --color-paper-raised: #161b22;
+  --color-ink: #e6edf3;
+  --color-ink-dim: #9ba7b4;
+  --color-ink-faint: #6e7781;
+  --color-line: #30363d;
+  --color-line-strong: #484f58;
 
-  --color-rust: #e08f5c;
-  --color-rust-dim: #c17040;
-  --color-rust-soft: #5c3320;
+  --color-accent: #58a6ff;
+  --color-accent-dim: #388bfd;
+  --color-accent-soft: #132a4d;
 
-  --color-olive: #b0c085;
-  --color-olive-dim: #8fa066;
-  --color-olive-soft: #3d4526;
+  --color-done: #3fb950;
+  --color-done-dim: #2ea043;
+  --color-done-soft: #122d1b;
 
-  --color-gold: #e2c077;
-  --color-gold-dim: #c9a355;
-  --color-gold-soft: #4a3a18;
-
-  --color-clay: #cf9a7d;
-  --color-clay-dim: #b8846a;
-  --color-clay-soft: #4a3226;
-
-  --color-slate: #8fb2c9;
-  --color-slate-dim: #6f96b2;
-  --color-slate-soft: #263c4a;
+  --color-attention: #d29922;
+  --color-attention-dim: #9e6a03;
+  --color-attention-soft: #3b2900;
 }
 
 html {
@@ -120,15 +103,8 @@ body {
 }
 
 ::selection {
-  background: var(--color-gold-soft);
+  background: var(--color-accent-soft);
   color: var(--color-ink);
-}
-
-/* subtle paper texture */
-.paper-texture {
-  background-image:
-    radial-gradient(circle at 1px 1px, rgba(43, 35, 24, 0.05) 1px, transparent 0);
-  background-size: 14px 14px;
 }
 
 ::-webkit-scrollbar {
@@ -138,7 +114,7 @@ body {
 
 /*
  * Preenchimento de "carregando" enquanto o toque prolongado (3s) está
- * pendente num card — sem isso a pessoa não sabe se segurar está
+ * pendente numa linha — sem isso a pessoa não sabe se segurar está
  * funcionando e solta ou mexe cedo demais, cancelando o arraste.
  */
 @keyframes dnd-pending-fill {
@@ -153,8 +129,8 @@ body {
 .dnd-pending {
   background-image: linear-gradient(
     to right,
-    color-mix(in srgb, var(--color-ink) 24%, transparent),
-    color-mix(in srgb, var(--color-ink) 24%, transparent)
+    color-mix(in srgb, var(--color-ink) 16%, transparent),
+    color-mix(in srgb, var(--color-ink) 16%, transparent)
   );
   background-repeat: no-repeat;
   background-size: 0% 100%;

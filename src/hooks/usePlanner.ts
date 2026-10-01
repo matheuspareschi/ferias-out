@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_CONTEXT_ID, DEFAULT_CONTEXTS } from '@/lib/contexts'
 import { defaultAnchorDayId } from '@/lib/days'
-import { needsV0Migration, normalizeState, type PlannerState } from '@/lib/migrations'
+import { CURRENT_SCHEMA_VERSION, needsMigration, normalizeState, type PlannerState } from '@/lib/migrations'
 import { buildSeedItems } from '@/lib/seed'
 import { SYNC_ENABLED, supabase } from '@/lib/supabaseClient'
 import type { Context, DayCategoryId, HabitId, Item } from '@/lib/types'
 
 const STORAGE_KEY = 'ferias-planner:v1'
-const BACKUP_KEY = 'ferias-planner:backup:pre-v1'
+const BACKUP_KEY = 'ferias-planner:backup:pre-migration'
 const SYNC_TABLE = 'planner_state'
 const SYNC_ROW_ID = 'default'
 
@@ -24,6 +24,11 @@ const HABIT_TITLE: Record<HabitId, string> = {
 
 function newId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+/** Tamanho P/M/G só existe (e só aparece) em itens do contexto Faculdade. */
+function clampSize(item: Item): Item {
+  return item.context === 'faculdade' ? item : { ...item, size: undefined }
 }
 
 function slugify(label: string): string {
@@ -68,7 +73,7 @@ function ensureDailyHabits(items: Item[], dayId: string): Item[] {
 
 function seedState(): PlannerState {
   return {
-    schemaVersion: 1,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     items: ensureDailyHabits(buildSeedItems(), defaultAnchorDayId()),
     contexts: DEFAULT_CONTEXTS,
     dayMeta: {},
@@ -86,7 +91,7 @@ function loadState(): PlannerState {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
-      if (needsV0Migration(parsed)) backupLegacyBlobIfNeeded(raw)
+      if (needsMigration(parsed)) backupLegacyBlobIfNeeded(raw)
       const normalized = normalizeState(parsed)
       if (normalized) return withTodayAnchor(normalized)
     }
@@ -162,7 +167,7 @@ export function usePlanner() {
           hasHydrated.current = true
           return
         }
-        if (needsV0Migration(data?.data)) backupLegacyBlobIfNeeded(JSON.stringify(data?.data))
+        if (needsMigration(data?.data)) backupLegacyBlobIfNeeded(JSON.stringify(data?.data))
         const remote = data?.data ? normalizeState(data.data) : null
         if (remote) {
           isRemoteUpdate.current = true
@@ -207,19 +212,11 @@ export function usePlanner() {
         Partial<
           Pick<
             Item,
-            | 'context'
-            | 'size'
-            | 'dayId'
-            | 'period'
-            | 'order'
-            | 'timeNote'
-            | 'color'
-            | 'referenceMonth'
-            | 'subitems'
+            'context' | 'size' | 'dayId' | 'period' | 'order' | 'timeNote' | 'referenceMonth' | 'parentId'
           >
         >,
     ) => {
-      const item: Item = {
+      const item: Item = clampSize({
         id: newId('item'),
         type: data.type,
         title: data.title.trim() || (data.type === 'event' ? 'Novo evento' : 'Nova tarefa'),
@@ -229,11 +226,10 @@ export function usePlanner() {
         period: data.period ?? null,
         order: data.order ?? 0,
         timeNote: data.timeNote,
-        color: data.color,
         referenceMonth: data.referenceMonth,
-        subitems: data.subitems,
+        parentId: data.parentId,
         done: false,
-      }
+      })
       setState((s) => ({ ...s, items: [...s.items, item] }))
       return item.id
     },
@@ -243,19 +239,52 @@ export function usePlanner() {
   const updateItem = useCallback((id: string, patch: Partial<Item>) => {
     setState((s) => ({
       ...s,
-      items: s.items.map((it) => (it.id === id ? { ...it, ...patch } : it)),
+      items: s.items.map((it) => (it.id === id ? clampSize({ ...it, ...patch }) : it)),
     }))
   }, [])
 
+  /** Apaga o item; subtarefas dele viram itens independentes (não some o trabalho junto). */
   const deleteItem = useCallback((id: string) => {
-    setState((s) => ({ ...s, items: s.items.filter((it) => it.id !== id) }))
-  }, [])
-
-  const toggleDone = useCallback((id: string) => {
     setState((s) => ({
       ...s,
-      items: s.items.map((it) => (it.id === id ? { ...it, done: !it.done } : it)),
+      items: s.items
+        .filter((it) => it.id !== id)
+        .map((it) => (it.parentId === id ? { ...it, parentId: undefined } : it)),
     }))
+  }, [])
+
+  /**
+   * Tica/destica um item. Se for uma subtarefa, resincroniza o progresso do
+   * pai (concluído automaticamente quando todas as irmãs terminam, e pode
+   * "desconcluir" se alguma voltar a ficar pendente). Completar manualmente
+   * um pai com subtarefas pendentes exige `cascadeToChildren: true` — quem
+   * decide pedir confirmação antes é a UI (ver PlannerBoard).
+   */
+  const toggleDone = useCallback((id: string, opts?: { cascadeToChildren?: boolean }) => {
+    setState((s) => {
+      const item = s.items.find((it) => it.id === id)
+      if (!item) return s
+      const children = s.items.filter((it) => it.parentId === id)
+      const nextDone = !item.done
+
+      if (children.length > 0 && nextDone && children.some((c) => !c.done) && !opts?.cascadeToChildren) {
+        return s
+      }
+
+      let items = s.items.map((it) => {
+        if (it.id === id) return { ...it, done: nextDone }
+        if (opts?.cascadeToChildren && it.parentId === id) return { ...it, done: true }
+        return it
+      })
+
+      if (item.parentId) {
+        const siblings = items.filter((it) => it.parentId === item.parentId)
+        const allDone = siblings.length > 0 && siblings.every((it) => it.done)
+        items = items.map((it) => (it.id === item.parentId ? { ...it, done: allDone } : it))
+      }
+
+      return { ...s, items }
+    })
   }, [])
 
   const setAnchorDay = useCallback((dayId: string) => {

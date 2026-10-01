@@ -1,8 +1,8 @@
 import { DEFAULT_CONTEXT_ID, DEFAULT_CONTEXTS } from './contexts'
 import { todayId } from './dates'
-import type { AccentColor, Context, DayCategoryId, DayMeta, HabitId, Item, ItemSize, PeriodId } from './types'
+import type { Context, DayCategoryId, DayMeta, HabitId, Item, ItemSize, PeriodId } from './types'
 
-export const CURRENT_SCHEMA_VERSION = 1 as const
+export const CURRENT_SCHEMA_VERSION = 2 as const
 
 export interface PlannerState {
   schemaVersion: typeof CURRENT_SCHEMA_VERSION
@@ -38,8 +38,15 @@ function pad2(n: number): string {
   return String(n).padStart(2, '0')
 }
 
-/** Shapes v0 (antes da unificação em Item) — cobre tanto o formato por período
- * quanto o formato ainda mais antigo por horário/duração. */
+/** Só existe (e só é exibido) em tarefas do contexto Faculdade (v2, confirmado). */
+function sizeAllowed(context: string, size: ItemSize | undefined): ItemSize | undefined {
+  return context === 'faculdade' ? size : undefined
+}
+
+// ---------------------------------------------------------------------------
+// v0 (AgendaItem/BacklogItem separados) → v1 (Item único, ainda com cor e checklist)
+// ---------------------------------------------------------------------------
+
 interface LegacyAgendaItemV0 {
   id: string
   dayId: string
@@ -49,7 +56,7 @@ interface LegacyAgendaItemV0 {
   timeNote?: string
   done?: boolean
   habit?: HabitId
-  color?: AccentColor
+  color?: string
   start?: string | null
   duration?: number | null
 }
@@ -78,6 +85,33 @@ interface LegacyStateV0 {
   dayCategories?: Record<string, DayCategoryId>
 }
 
+/** Item como existia na v1: Item atual + campos já removidos na v2. */
+interface ItemV1 {
+  id: string
+  type: 'task' | 'event'
+  title: string
+  context: string
+  size?: ItemSize
+  dayId?: string
+  period?: PeriodId | null
+  order: number
+  timeNote?: string
+  done: boolean
+  habit?: HabitId
+  color?: string
+  referenceMonth?: string
+  migratedFrom?: string
+  subitems?: { id: string; title: string; done: boolean }[]
+}
+
+interface PlannerStateV1 {
+  schemaVersion: 1
+  items: ItemV1[]
+  contexts: Context[]
+  dayMeta: Record<string, DayMeta>
+  anchorDayId: string
+}
+
 function legacyPeriodAndNote(raw: {
   period?: PeriodId | null
   timeNote?: string
@@ -101,8 +135,8 @@ function legacyPeriodAndNote(raw: {
  * isso é o mais próximo de um "evento"; um BacklogItem era sempre uma
  * "tarefa" flutuante. Pura — não grava nada, quem chama decide se faz backup.
  */
-export function migrateV0ToV1(raw: LegacyStateV0): PlannerState {
-  const items: Item[] = []
+function migrateV0ToV1(raw: LegacyStateV0): PlannerStateV1 {
+  const items: ItemV1[] = []
   const orderCounters = new Map<string, number>()
   function nextOrder(dayId: string, period: PeriodId | null): number {
     const key = `${dayId}:${period ?? 'none'}`
@@ -162,11 +196,56 @@ export function migrateV0ToV1(raw: LegacyStateV0): PlannerState {
   }
 
   return {
-    schemaVersion: CURRENT_SCHEMA_VERSION,
+    schemaVersion: 1,
     items,
     contexts: DEFAULT_CONTEXTS,
     dayMeta,
     anchorDayId: raw.anchorDayId ?? todayId(),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// v1 → v2 (atual): sem cor por item; checklist vira subtarefas reais; tamanho
+// só sobrevive em itens do contexto Faculdade.
+// ---------------------------------------------------------------------------
+
+/**
+ * v1 → v2: remove `color` (sem cor por item, v2 da especificação); cada
+ * `subitems[]` vira Item de verdade com `parentId`, herdando dia/período/
+ * contexto do pai (fica junto dele até o usuário mover); tamanho passa a só
+ * existir em itens do contexto Faculdade — os demais perdem o campo aqui
+ * (o blob pré-migração guarda o valor original). Pura.
+ */
+function migrateV1ToV2(v1: PlannerStateV1): PlannerState {
+  const items: Item[] = []
+
+  for (const raw of v1.items) {
+    const { color: _color, subitems, ...rest } = raw
+    void _color
+    items.push({ ...rest, size: sizeAllowed(rest.context, rest.size) })
+
+    subitems?.forEach((sub, idx) => {
+      items.push({
+        id: sub.id,
+        type: 'task',
+        title: sub.title,
+        context: rest.context,
+        dayId: rest.dayId,
+        period: rest.period ?? null,
+        // logo depois do pai na mesma lista, preservando a ordem entre elas
+        order: rest.order + (idx + 1) / 1000,
+        done: sub.done,
+        parentId: rest.id,
+      })
+    })
+  }
+
+  return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    items,
+    contexts: v1.contexts,
+    dayMeta: v1.dayMeta,
+    anchorDayId: v1.anchorDayId,
   }
 }
 
@@ -176,29 +255,30 @@ function isLegacyV0(parsed: Record<string, unknown>): boolean {
 
 function normalizeItem(raw: Partial<Item>): Item | null {
   if (!raw || typeof raw.id !== 'string' || typeof raw.title !== 'string') return null
+  const context = raw.context ?? DEFAULT_CONTEXT_ID
   return {
     id: raw.id,
     type: raw.type === 'event' ? 'event' : 'task',
     title: raw.title,
-    context: raw.context ?? DEFAULT_CONTEXT_ID,
-    size: raw.size,
+    context,
+    size: sizeAllowed(context, raw.size),
     dayId: raw.dayId,
     period: raw.period ?? null,
     order: raw.order ?? 0,
     timeNote: raw.timeNote,
     done: raw.done ?? false,
     habit: raw.habit,
-    color: raw.color,
     referenceMonth: raw.referenceMonth,
     migratedFrom: raw.migratedFrom,
-    subitems: raw.subitems,
+    parentId: raw.parentId,
   }
 }
 
 /**
  * Ponto único de entrada pra carregar um blob salvo (localStorage ou
- * Supabase) — decide se já está no formato atual ou se precisa migrar a
- * partir do v0. Retorna `null` se o formato for irreconhecível (cai pro seed).
+ * Supabase) — decide se já está no formato atual ou encadeia as migrações
+ * necessárias (v0→v1→v2). Retorna `null` se o formato for irreconhecível
+ * (cai pro seed).
  */
 export function normalizeState(parsed: unknown): PlannerState | null {
   if (!parsed || typeof parsed !== 'object') return null
@@ -220,16 +300,21 @@ export function normalizeState(parsed: unknown): PlannerState | null {
     }
   }
 
+  if (obj.schemaVersion === 1) {
+    return migrateV1ToV2(obj as unknown as PlannerStateV1)
+  }
+
   if (isLegacyV0(obj)) {
-    return migrateV0ToV1(obj as LegacyStateV0)
+    return migrateV1ToV2(migrateV0ToV1(obj as LegacyStateV0))
   }
 
   return null
 }
 
-/** Verdadeiro quando `parsed` precisa passar pela migração v0→v1 (pra decidir se faz backup antes). */
-export function needsV0Migration(parsed: unknown): boolean {
+/** Verdadeiro quando `parsed` precisa de alguma migração de esquema (pra decidir se faz backup antes). */
+export function needsMigration(parsed: unknown): boolean {
   if (!parsed || typeof parsed !== 'object') return false
   const obj = parsed as Record<string, unknown>
-  return obj.schemaVersion !== CURRENT_SCHEMA_VERSION && isLegacyV0(obj)
+  if (obj.schemaVersion === CURRENT_SCHEMA_VERSION) return false
+  return obj.schemaVersion === 1 || isLegacyV0(obj)
 }

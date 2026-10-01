@@ -168,8 +168,9 @@ function agendaItems(): Item[] {
   ]
 }
 
-function backlog(title: string, context: string, size: ItemSize): Item {
-  return { id: nextId('backlog'), type: 'task', title, context, size, order: 0, done: false }
+function backlog(title: string, context: string, size?: ItemSize): Item {
+  // Tamanho P/M/G só existe (e só é exibido) em itens do contexto Faculdade.
+  return { id: nextId('backlog'), type: 'task', title, context, size: context === 'faculdade' ? size : undefined, order: 0, done: false }
 }
 
 function backlogItems(): Item[] {
@@ -177,11 +178,11 @@ function backlogItems(): Item[] {
     backlog('Aula — a definir 1', 'faculdade', 'M'),
     backlog('Aula — a definir 2', 'faculdade', 'M'),
     backlog('Aula — a definir 3', 'faculdade', 'M'),
-    backlog('Preparo de aula do JVJ', DEFAULT_CONTEXT_ID, 'M'),
-    backlog('Preparo de Estudo Bíblico', DEFAULT_CONTEXT_ID, 'M'),
-    backlog('Preparo de Estudo Bíblico', DEFAULT_CONTEXT_ID, 'M'),
-    backlog('Preparo de aula para o GAEB', 'gaeb', 'M'),
-    backlog('Lavar o carro', DEFAULT_CONTEXT_ID, 'P'),
+    backlog('Preparo de aula do JVJ', DEFAULT_CONTEXT_ID),
+    backlog('Preparo de Estudo Bíblico', DEFAULT_CONTEXT_ID),
+    backlog('Preparo de Estudo Bíblico', DEFAULT_CONTEXT_ID),
+    backlog('Preparo de aula para o GAEB', 'gaeb'),
+    backlog('Lavar o carro', DEFAULT_CONTEXT_ID),
   ]
 }
 

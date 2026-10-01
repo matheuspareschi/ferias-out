@@ -7,9 +7,6 @@ export type HabitId = 'devocional' | 'alongamento' | 'leitura' | 'exercicio' | '
 
 export type DayCategoryId = 'piedade' | 'lazer' | 'geral' | 'estudo' | 'livre' | 'outro'
 
-/** Paleta de destaque usada nos blocos — cor padrão do item ou escolha do usuário. */
-export type AccentColor = 'clay' | 'rust' | 'olive' | 'gold' | 'ink'
-
 /** Período do dia — substitui o horário/duração como forma de agendar. */
 export type PeriodId = 'manha' | 'tarde' | 'noite'
 
@@ -20,19 +17,18 @@ export type PeriodId = 'manha' | 'tarde' | 'noite'
  */
 export type ItemType = 'task' | 'event'
 
+/** Só existe (e só é exibido) pra tarefas do contexto Faculdade. */
 export type ItemSize = 'P' | 'M' | 'G'
-
-export interface Subitem {
-  id: string
-  title: string
-  done: boolean
-}
 
 /**
  * Entidade única pra tudo que o usuário anota — substitui o antigo par
  * AgendaItem (preso a um dia) / BacklogItem (flutuante, com alocação
  * opcional). Sem `dayId` o item mora só no backlog; com `dayId` ele aparece
  * na grade daquele dia e some do backlog (nunca os dois ao mesmo tempo).
+ *
+ * Sem cor própria (v2 da especificação): a distinção visual entre tarefa,
+ * evento, tarefa-pai e subtarefa é só por forma/símbolo (ver ItemRow), nunca
+ * por tonalidade.
  */
 export interface Item {
   id: string
@@ -40,7 +36,7 @@ export interface Item {
   title: string
   /** Id de um Context (ver contexts.ts) — todo item pertence a um contexto. */
   context: string
-  /** Tamanho P/M/G — independente do contexto, só um indicador de esforço. */
+  /** Tamanho P/M/G — só existe (e só aparece) em tarefas do contexto Faculdade. */
   size?: ItemSize
   /** Dia em que o item aparece na grade; sem valor = ainda no backlog. */
   dayId?: string
@@ -50,20 +46,22 @@ export interface Item {
   order: number
   /**
    * Texto livre opcional pra guardar um horário específico relevante (ex.: "17:00" ou
-   * "9:00–11:00") — é só uma anotação exibida no card, não define layout nem ordena nada.
+   * "9:00–11:00") — é só uma anotação exibida na linha, não define layout nem ordena nada.
    */
   timeNote?: string
   done: boolean
   /** Marca os hábitos diários da rotina-base, exibidos à parte na HabitStrip. */
   habit?: HabitId
-  /** Cor de destaque escolhida pelo usuário; sem valor usa o padrão 'clay'. */
-  color?: AccentColor
   /** Mês de referência no backlog ("YYYY-MM") — só faz sentido sem dayId. */
   referenceMonth?: string
-  /** Dia de origem da última migração (painel de pendentes) — mostra o símbolo `>`. */
+  /** Dia de origem da última migração — mostra o símbolo `>`. */
   migratedFrom?: string
-  /** Checklist simples dentro do item. */
-  subitems?: Subitem[]
+  /**
+   * Id da tarefa-pai, se este item for uma subtarefa (um nível só: uma
+   * subtarefa nunca tem suas próprias subtarefas). A tarefa-pai não guarda
+   * a lista de filhas — elas são encontradas filtrando por `parentId`.
+   */
+  parentId?: string
 }
 
 /** Contexto — lista editável (Pessoal, Faculdade, GAEB, Conexão, Acampamento, Estágio…). */

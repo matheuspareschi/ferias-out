@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { CURRENT_SCHEMA_VERSION, migrateV0ToV1, needsV0Migration, normalizeState } from './migrations'
+import { CURRENT_SCHEMA_VERSION, needsMigration, normalizeState } from './migrations'
 
-describe('migrateV0ToV1', () => {
+describe('normalizeState — v0 (AgendaItem/BacklogItem) → v2', () => {
   it('merges agendaItems and backlogItems into one items[] array', () => {
-    const result = migrateV0ToV1({
+    const result = normalizeState({
       agendaItems: [{ id: 'a1', dayId: '2026-09-25', title: 'Culto', period: 'noite', order: 0, done: false }],
       backlogItems: [{ id: 'b1', title: 'Lavar o carro', category: 'tarefa', size: 'P', done: false }],
       anchorDayId: '2026-09-25',
     })
-    expect(result.items).toHaveLength(2)
-    expect(result.items.map((i) => i.id)).toEqual(['a1', 'b1'])
+    expect(result?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(result?.items.map((i) => i.id)).toEqual(['a1', 'b1'])
   })
 
   it('assigns type event to non-habit agenda items and task to habits and backlog items', () => {
-    const result = migrateV0ToV1({
+    const result = normalizeState({
       agendaItems: [
         { id: 'a1', dayId: '2026-09-25', title: 'Culto', period: 'noite', order: 0, done: false },
         { id: 'a2', dayId: '2026-09-25', title: 'Devocional', period: null, order: 0, done: false, habit: 'devocional' },
@@ -21,14 +21,14 @@ describe('migrateV0ToV1', () => {
       backlogItems: [{ id: 'b1', title: 'Lavar o carro', category: 'tarefa', size: 'P', done: false }],
       anchorDayId: '2026-09-25',
     })
-    const byId = Object.fromEntries(result.items.map((i) => [i.id, i]))
+    const byId = Object.fromEntries(result!.items.map((i) => [i.id, i]))
     expect(byId.a1.type).toBe('event')
     expect(byId.a2.type).toBe('task')
     expect(byId.b1.type).toBe('task')
   })
 
   it('applies the confirmed category → context mapping', () => {
-    const result = migrateV0ToV1({
+    const result = normalizeState({
       agendaItems: [],
       backlogItems: [
         { id: 'b1', title: 'Aula — a definir 1', category: 'aula', size: 'M', done: false },
@@ -38,7 +38,7 @@ describe('migrateV0ToV1', () => {
       ],
       anchorDayId: '2026-09-25',
     })
-    const byId = Object.fromEntries(result.items.map((i) => [i.id, i]))
+    const byId = Object.fromEntries(result!.items.map((i) => [i.id, i]))
     expect(byId.b1.context).toBe('faculdade')
     expect(byId.b2.context).toBe('pessoal')
     expect(byId.b3.context).toBe('gaeb')
@@ -46,7 +46,7 @@ describe('migrateV0ToV1', () => {
   })
 
   it('carries over an existing allocation as dayId/period/order and leaves unallocated items in the backlog', () => {
-    const result = migrateV0ToV1({
+    const result = normalizeState({
       agendaItems: [],
       backlogItems: [
         {
@@ -61,7 +61,7 @@ describe('migrateV0ToV1', () => {
       ],
       anchorDayId: '2026-09-25',
     })
-    const byId = Object.fromEntries(result.items.map((i) => [i.id, i]))
+    const byId = Object.fromEntries(result!.items.map((i) => [i.id, i]))
     expect(byId.b1.dayId).toBe('2026-09-26')
     expect(byId.b1.period).toBe('manha')
     expect(byId.b1.order).toBe(2)
@@ -69,60 +69,134 @@ describe('migrateV0ToV1', () => {
   })
 
   it('converts legacy start/duration into period + a human-readable timeNote', () => {
-    const result = migrateV0ToV1({
-      agendaItems: [
-        { id: 'a1', dayId: '2026-09-25', title: 'Reunião', start: '14:00', duration: 60, done: false },
-      ],
+    const result = normalizeState({
+      agendaItems: [{ id: 'a1', dayId: '2026-09-25', title: 'Reunião', start: '14:00', duration: 60, done: false }],
       backlogItems: [],
       anchorDayId: '2026-09-25',
     })
-    expect(result.items[0].period).toBe('tarde')
-    expect(result.items[0].timeNote).toBe('14:00–15:00')
+    expect(result!.items[0].period).toBe('tarde')
+    expect(result!.items[0].timeNote).toBe('14:00–15:00')
   })
 
   it('converts dayCategories into dayMeta', () => {
-    const result = migrateV0ToV1({
+    const result = normalizeState({
       agendaItems: [],
       backlogItems: [],
       anchorDayId: '2026-09-25',
       dayCategories: { '2026-09-25': 'piedade' },
     })
-    expect(result.dayMeta['2026-09-25']).toEqual({ category: 'piedade' })
+    expect(result!.dayMeta['2026-09-25']).toEqual({ category: 'piedade' })
   })
 
-  it('stamps the current schema version and seeds the default context list', () => {
-    const result = migrateV0ToV1({ agendaItems: [], backlogItems: [], anchorDayId: '2026-09-25' })
-    expect(result.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
-    expect(result.contexts.map((c) => c.id)).toContain('pessoal')
-    expect(result.contexts.map((c) => c.id)).toContain('faculdade')
+  it('seeds the default context list and drops the P/M/G size for non-Faculdade items', () => {
+    const result = normalizeState({
+      agendaItems: [],
+      backlogItems: [{ id: 'b1', title: 'Lavar o carro', category: 'tarefa', size: 'P', done: false }],
+      anchorDayId: '2026-09-25',
+    })
+    expect(result!.contexts.map((c) => c.id)).toContain('pessoal')
+    expect(result!.contexts.map((c) => c.id)).toContain('faculdade')
+    expect(result!.items[0].size).toBeUndefined()
   })
 })
 
-describe('needsV0Migration', () => {
-  it('is true for legacy shapes without a schemaVersion', () => {
-    expect(needsV0Migration({ agendaItems: [], backlogItems: [], anchorDayId: '2026-09-25' })).toBe(true)
+describe('normalizeState — v1 (Item único, com cor/checklist) → v2', () => {
+  function v1State(overrides: Record<string, unknown> = {}) {
+    return {
+      schemaVersion: 1,
+      contexts: [{ id: 'pessoal', label: 'Pessoal' }, { id: 'faculdade', label: 'Faculdade' }],
+      dayMeta: {},
+      anchorDayId: '2026-09-25',
+      items: [],
+      ...overrides,
+    }
+  }
+
+  it('drops the color field', () => {
+    const result = normalizeState(
+      v1State({
+        items: [{ id: 'i1', type: 'task', title: 'Tarefa', context: 'pessoal', order: 0, done: false, color: 'rust' }],
+      }),
+    )
+    expect(result!.items[0]).not.toHaveProperty('color')
+  })
+
+  it('keeps size for Faculdade items and drops it for everything else', () => {
+    const result = normalizeState(
+      v1State({
+        items: [
+          { id: 'i1', type: 'task', title: 'Aula HC3', context: 'faculdade', size: 'M', order: 0, done: false },
+          { id: 'i2', type: 'task', title: 'Lavar o carro', context: 'pessoal', size: 'P', order: 0, done: false },
+        ],
+      }),
+    )
+    const byId = Object.fromEntries(result!.items.map((i) => [i.id, i]))
+    expect(byId.i1.size).toBe('M')
+    expect(byId.i2.size).toBeUndefined()
+  })
+
+  it('turns subitems into real child Items with parentId, inheriting dayId/period/context', () => {
+    const result = normalizeState(
+      v1State({
+        items: [
+          {
+            id: 'parent-1',
+            type: 'task',
+            title: 'Preparar o GAEB',
+            context: 'gaeb',
+            dayId: '2026-09-25',
+            period: 'tarde',
+            order: 0,
+            done: false,
+            subitems: [
+              { id: 'sub-1', title: 'Escolher música', done: false },
+              { id: 'sub-2', title: 'Preparar estudo', done: true },
+            ],
+          },
+        ],
+      }),
+    )
+    expect(result!.items).toHaveLength(3)
+    const byId = Object.fromEntries(result!.items.map((i) => [i.id, i]))
+    expect(byId['parent-1']).not.toHaveProperty('subitems')
+    expect(byId['sub-1']).toMatchObject({
+      type: 'task',
+      title: 'Escolher música',
+      context: 'gaeb',
+      dayId: '2026-09-25',
+      period: 'tarde',
+      done: false,
+      parentId: 'parent-1',
+    })
+    expect(byId['sub-2'].done).toBe(true)
+  })
+
+  it('leaves items without subitems untouched aside from dropping color', () => {
+    const result = normalizeState(
+      v1State({
+        items: [{ id: 'i1', type: 'event', title: 'Culto', context: 'pessoal', order: 0, done: false }],
+      }),
+    )
+    expect(result!.items).toHaveLength(1)
+  })
+})
+
+describe('needsMigration', () => {
+  it('is true for legacy v0 shapes and for v1', () => {
+    expect(needsMigration({ agendaItems: [], backlogItems: [], anchorDayId: '2026-09-25' })).toBe(true)
+    expect(needsMigration({ schemaVersion: 1, items: [], anchorDayId: '2026-09-25' })).toBe(true)
   })
 
   it('is false for the current shape and for garbage', () => {
-    expect(needsV0Migration({ schemaVersion: CURRENT_SCHEMA_VERSION, items: [], anchorDayId: '2026-09-25' })).toBe(
+    expect(needsMigration({ schemaVersion: CURRENT_SCHEMA_VERSION, items: [], anchorDayId: '2026-09-25' })).toBe(
       false,
     )
-    expect(needsV0Migration(null)).toBe(false)
-    expect(needsV0Migration({})).toBe(false)
+    expect(needsMigration(null)).toBe(false)
+    expect(needsMigration({})).toBe(false)
   })
 })
 
-describe('normalizeState', () => {
-  it('migrates a legacy v0 blob end to end', () => {
-    const result = normalizeState({
-      agendaItems: [{ id: 'a1', dayId: '2026-09-25', title: 'Culto', period: 'noite', order: 0, done: false }],
-      backlogItems: [],
-      anchorDayId: '2026-09-25',
-    })
-    expect(result?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
-    expect(result?.items).toHaveLength(1)
-  })
-
+describe('normalizeState — current shape passthrough', () => {
   it('passes through an already-current blob, filling in missing optional fields', () => {
     const result = normalizeState({
       schemaVersion: CURRENT_SCHEMA_VERSION,
