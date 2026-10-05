@@ -97,6 +97,7 @@ function seedState(): PlannerState {
     estagioNotes: '',
     estagioHours: [],
     retrospectives: {},
+    dismissedDayLabels: [],
   }
 }
 
@@ -561,6 +562,11 @@ export function usePlanner() {
     })
   }, [])
 
+  /** Descarta um rótulo legado de DAY_LABELS (5.1, wizard de limpeza) — não apaga a constante, só esconde na UI. */
+  const dismissDayLabel = useCallback((dayId: string) => {
+    setState((s) => (s.dismissedDayLabels.includes(dayId) ? s : { ...s, dismissedDayLabels: [...s.dismissedDayLabels, dayId] }))
+  }, [])
+
   const importState = useCallback((json: string): boolean => {
     try {
       const normalized = normalizeState(JSON.parse(json))
@@ -586,6 +592,7 @@ export function usePlanner() {
     estagioNotes: state.estagioNotes,
     estagioHours: state.estagioHours,
     retrospectives: state.retrospectives,
+    dismissedDayLabels: state.dismissedDayLabels,
     syncStatus,
     addItem,
     updateItem,
@@ -614,6 +621,7 @@ export function usePlanner() {
     addEstagioHours,
     deleteEstagioHours,
     setRetrospective,
+    dismissDayLabel,
     /** Estado completo, pronto pra `JSON.stringify` num botão de exportar. */
     exportState: () => state,
     importState,

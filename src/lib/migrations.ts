@@ -18,7 +18,7 @@ import type {
   Unit,
 } from './types'
 
-export const CURRENT_SCHEMA_VERSION = 5 as const
+export const CURRENT_SCHEMA_VERSION = 6 as const
 
 export interface PlannerState {
   schemaVersion: typeof CURRENT_SCHEMA_VERSION
@@ -37,6 +37,8 @@ export interface PlannerState {
   estagioHours: EstagioHoursEntry[]
   /** Retrospectiva mensal, chaveada por "YYYY-MM". */
   retrospectives: Record<string, Retrospective>
+  /** Dias de DAY_LABELS que o usuário descartou na limpeza de legado (5.1). */
+  dismissedDayLabels: string[]
 }
 
 /** Rotina-base gravada antes da HabitStrip existir não tinha o campo `habit`. */
@@ -366,16 +368,44 @@ function migrateV3ToV4(v3: PlannerStateV3): PlannerStateV4 {
 }
 
 // ---------------------------------------------------------------------------
-// v4 → v5 (atual): adiciona o hábito "sem_internet" e `referenceWeek` em
-// Item (2.3.1, backlog por semana) — nenhum dado existente muda, só ganham
+// v4 → v5: adiciona o hábito "sem_internet" e `referenceWeek` em Item
+// (2.3.1, backlog por semana) — nenhum dado existente muda, só ganham
 // campos/valores possíveis novos. O hábito novo só passa a existir de fato
 // quando `ensureDailyHabits` o criar pra algum dia visitado; nada aqui cria
 // itens de hábito retroativamente.
 // ---------------------------------------------------------------------------
 
+interface PlannerStateV5 {
+  schemaVersion: 5
+  items: Item[]
+  contexts: Context[]
+  dayMeta: Record<string, DayMeta>
+  anchorDayId: string
+  disciplines: Discipline[]
+  units: Unit[]
+  facultyNotes: FacultyNotes
+  gaebIdeias: GaebIdea[]
+  gaebEncontros: GaebEncontro[]
+  projectNotes: Record<string, string>
+  estagioNotes: string
+  estagioHours: EstagioHoursEntry[]
+  retrospectives: Record<string, Retrospective>
+}
+
 /** v4 → v5: passthrough puro — nada muda nos dados, só o formato aceita os campos novos. */
-function migrateV4ToV5(v4: PlannerStateV4): PlannerState {
-  return { ...v4, schemaVersion: CURRENT_SCHEMA_VERSION }
+function migrateV4ToV5(v4: PlannerStateV4): PlannerStateV5 {
+  return { ...v4, schemaVersion: 5 }
+}
+
+// ---------------------------------------------------------------------------
+// v5 → v6 (atual): adiciona `dismissedDayLabels` pra limpeza de legado (5.1)
+// — a wizard de revisão marca tags de dia antigas (viagem/retiro/etc.) como
+// descartadas sem apagar a constante DAY_LABELS. Nenhum dado existente muda.
+// ---------------------------------------------------------------------------
+
+/** v5 → v6: passthrough puro — só ganha o campo novo, vazio. */
+function migrateV5ToV6(v5: PlannerStateV5): PlannerState {
+  return { ...v5, schemaVersion: CURRENT_SCHEMA_VERSION, dismissedDayLabels: [] }
 }
 
 function isLegacyV0(parsed: Record<string, unknown>): boolean {
@@ -455,6 +485,7 @@ export function normalizeState(parsed: unknown): PlannerState | null {
     const projectNotes = (obj.projectNotes as Record<string, string>) ?? {}
     const estagioHours = Array.isArray(obj.estagioHours) ? (obj.estagioHours as EstagioHoursEntry[]) : []
     const retrospectives = (obj.retrospectives as Record<string, Retrospective>) ?? {}
+    const dismissedDayLabels = Array.isArray(obj.dismissedDayLabels) ? (obj.dismissedDayLabels as string[]) : []
     return {
       schemaVersion: CURRENT_SCHEMA_VERSION,
       items,
@@ -470,27 +501,32 @@ export function normalizeState(parsed: unknown): PlannerState | null {
       estagioNotes: typeof obj.estagioNotes === 'string' ? obj.estagioNotes : '',
       estagioHours,
       retrospectives,
+      dismissedDayLabels,
     }
   }
 
+  if (obj.schemaVersion === 5) {
+    return migrateV5ToV6(obj as unknown as PlannerStateV5)
+  }
+
   if (obj.schemaVersion === 4) {
-    return migrateV4ToV5(obj as unknown as PlannerStateV4)
+    return migrateV5ToV6(migrateV4ToV5(obj as unknown as PlannerStateV4))
   }
 
   if (obj.schemaVersion === 3) {
-    return migrateV4ToV5(migrateV3ToV4(obj as unknown as PlannerStateV3))
+    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(obj as unknown as PlannerStateV3)))
   }
 
   if (obj.schemaVersion === 2) {
-    return migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(obj as unknown as PlannerStateV2)))
+    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(obj as unknown as PlannerStateV2))))
   }
 
   if (obj.schemaVersion === 1) {
-    return migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(obj as unknown as PlannerStateV1))))
+    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(obj as unknown as PlannerStateV1)))))
   }
 
   if (isLegacyV0(obj)) {
-    return migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(migrateV0ToV1(obj as LegacyStateV0)))))
+    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(migrateV0ToV1(obj as LegacyStateV0))))))
   }
 
   return null
@@ -506,6 +542,7 @@ export function needsMigration(parsed: unknown): boolean {
     obj.schemaVersion === 2 ||
     obj.schemaVersion === 3 ||
     obj.schemaVersion === 4 ||
+    obj.schemaVersion === 5 ||
     isLegacyV0(obj)
   )
 }

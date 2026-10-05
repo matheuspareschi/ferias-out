@@ -30,6 +30,8 @@ interface DayColumnProps {
   onGoToday: () => void
   /** false quando já está vendo hoje — some o botão "Hoje". */
   showTodayButton: boolean
+  /** Dias de DAY_LABELS que o usuário descartou na limpeza de legado (5.1) — não aparecem mais no cabeçalho. */
+  dismissedDayLabels: string[]
 }
 
 export function DayColumn({
@@ -47,6 +49,7 @@ export function DayColumn({
   onGoPrev,
   onGoToday,
   showTodayButton,
+  dismissedDayLabels,
 }: DayColumnProps) {
   // Dias passados continuam editáveis — só ganham uma marcação informativa no cabeçalho.
   const isPast = isPastDay(dayId)
@@ -55,7 +58,7 @@ export function DayColumn({
   const habitItems = items.filter((it) => it.habit)
   const otherItems = items.filter((it) => !it.habit)
   const unassigned = otherItems.filter((it) => !it.period)
-  const label = dayLabel(dayId)
+  const label = dismissedDayLabels.includes(dayId) ? undefined : dayLabel(dayId)
 
   // Pendentes de dias ANTERIORES ao que está sendo visto (2.3) — não é mais só "ontem".
   const pendingItems = allItems

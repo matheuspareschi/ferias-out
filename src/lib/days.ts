@@ -18,7 +18,8 @@ export const WEEKDAY_LONG: Record<string, string> = {
  * (24/09–12/10/2026). Fora dessas datas, `dayLabel` simplesmente não acha
  * nada, o que já é o comportamento certo pra um calendário sem fim.
  */
-const DAY_LABELS: Record<string, string> = {
+/** Exportado pra a wizard de limpeza de legado (5.1) poder listar todas as tags existentes. */
+export const DAY_LABELS: Record<string, string> = {
   '2026-09-28': 'Bauru Day',
   '2026-10-03': 'dia-buffer',
   '2026-10-06': 'Retiro',

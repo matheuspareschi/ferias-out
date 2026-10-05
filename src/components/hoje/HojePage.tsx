@@ -196,6 +196,7 @@ export function HojePage({ planner }: HojePageProps) {
               onGoPrev={goPrev}
               onGoToday={goToday}
               showTodayButton={day.id !== todayId()}
+              dismissedDayLabels={planner.dismissedDayLabels}
             />
           </div>
         </div>

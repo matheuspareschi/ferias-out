@@ -325,13 +325,68 @@ describe('normalizeState — v4 (sem referenceWeek) → v5', () => {
   })
 })
 
+describe('normalizeState — v5 (sem dismissedDayLabels) → v6', () => {
+  function v5State(overrides: Record<string, unknown> = {}) {
+    return {
+      schemaVersion: 5,
+      contexts: [{ id: 'pessoal', label: 'Pessoal' }],
+      dayMeta: {},
+      anchorDayId: '2026-09-25',
+      items: [{ id: 'i1', type: 'task', title: 'Lavar o carro', context: 'pessoal', order: 0, done: false }],
+      disciplines: [{ id: 'hb', sigla: 'HB', name: 'Hebraico Bíblico' }],
+      units: [],
+      facultyNotes: { general: '', byDiscipline: {} },
+      gaebIdeias: [],
+      gaebEncontros: [],
+      projectNotes: {},
+      estagioNotes: '',
+      estagioHours: [],
+      retrospectives: {},
+      ...overrides,
+    }
+  }
+
+  it('is a pure passthrough — nothing changes, dismissedDayLabels starts empty', () => {
+    const result = normalizeState(v5State())
+    expect(result?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(result?.dismissedDayLabels).toEqual([])
+    expect(result?.items[0].id).toBe('i1')
+  })
+
+  it('chains all the way from v0 through v4', () => {
+    const fromV0 = normalizeState({ agendaItems: [], backlogItems: [], anchorDayId: '2026-09-25' })
+    expect(fromV0?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(fromV0?.dismissedDayLabels).toEqual([])
+
+    const fromV4 = normalizeState({
+      schemaVersion: 4,
+      contexts: [{ id: 'pessoal', label: 'Pessoal' }],
+      dayMeta: {},
+      anchorDayId: '2026-09-25',
+      items: [],
+      disciplines: [],
+      units: [],
+      facultyNotes: { general: '', byDiscipline: {} },
+      gaebIdeias: [],
+      gaebEncontros: [],
+      projectNotes: {},
+      estagioNotes: '',
+      estagioHours: [],
+      retrospectives: {},
+    })
+    expect(fromV4?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(fromV4?.dismissedDayLabels).toEqual([])
+  })
+})
+
 describe('needsMigration', () => {
-  it('is true for legacy v0 shapes, v1, v2, v3 and v4', () => {
+  it('is true for legacy v0 shapes, v1, v2, v3, v4 and v5', () => {
     expect(needsMigration({ agendaItems: [], backlogItems: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 1, items: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 2, items: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 3, items: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 4, items: [], anchorDayId: '2026-09-25' })).toBe(true)
+    expect(needsMigration({ schemaVersion: 5, items: [], anchorDayId: '2026-09-25' })).toBe(true)
   })
 
   it('is false for the current shape and for garbage', () => {
@@ -353,6 +408,17 @@ describe('normalizeState — current shape passthrough', () => {
     expect(result?.items[0]).toMatchObject({ id: 'i1', title: 'Tarefa', type: 'task', done: false, order: 0 })
     expect(result?.disciplines.length).toBeGreaterThan(0)
     expect(result?.units).toEqual([])
+    expect(result?.dismissedDayLabels).toEqual([])
+  })
+
+  it('carries dismissedDayLabels through when already present', () => {
+    const result = normalizeState({
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      items: [],
+      anchorDayId: '2026-09-25',
+      dismissedDayLabels: ['2026-10-03'],
+    })
+    expect(result?.dismissedDayLabels).toEqual(['2026-10-03'])
   })
 
   it('returns null for unrecognizable input', () => {

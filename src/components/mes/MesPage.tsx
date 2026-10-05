@@ -1,12 +1,12 @@
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { ItemGlyph } from '@/components/ItemGlyph'
+import { CleanupWizard } from '@/components/mes/CleanupWizard'
 import { EditItemModal, type ModalState } from '@/components/planner/EditItemModal'
 import { useItemActions } from '@/hooks/useItemActions'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
 import { addMonths, daysInMonthCount, todayId, weekdayOf } from '@/lib/dates'
 import { isPastDay } from '@/lib/days'
-import { HABIT_ICON, HABIT_ORDER } from '@/lib/habits'
 import type { Item } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -26,14 +26,25 @@ function monthLabel(monthId: string): string {
 }
 
 /**
- * Itens do dia — inclui compromissos de vários dias (endDayId) que passam
- * por ele. Hábitos ficam de fora: eles já têm sua própria faixa (habitItems
- * no row), igual à Semana — não entram misturados na lista de tarefas.
+ * Mês enxuto (5.1): só compromissos de verdade (eventos) e ★ entregas — uma
+ * linha por dia, sem listar tarefa simples nenhuma (isso fica pra visão
+ * Hoje/Backlog). Inclui compromissos de vários dias (endDayId) que passam
+ * por este. Hábitos nunca entram aqui — já têm página própria.
  */
 function itemsForDay(items: Item[], dayId: string): Item[] {
   return items
-    .filter((it) => !it.habit && it.dayId && (it.dayId === dayId || (it.endDayId && it.dayId < dayId && dayId <= it.endDayId)))
+    .filter(
+      (it) =>
+        (it.type === 'event' || it.isDelivery) &&
+        it.dayId &&
+        (it.dayId === dayId || (it.endDayId && it.dayId < dayId && dayId <= it.endDayId)),
+    )
     .sort((a, b) => a.order - b.order)
+}
+
+/** Dia passado com tarefa simples ainda não concluída — destaque discreto, sem listar o quê (5.1). */
+function hasPendingTasks(items: Item[], dayId: string): boolean {
+  return items.some((it) => it.dayId === dayId && it.type === 'task' && !it.habit && !it.done)
 }
 
 function MonthItemLine({ item, onToggleDone, onOpen }: { item: Item; onToggleDone: () => void; onOpen: () => void }) {
@@ -56,6 +67,7 @@ function MonthItemLine({ item, onToggleDone, onOpen }: { item: Item; onToggleDon
 
 export function MesPage({ planner, month, onMonthChange, onOpenRetrospectiva, onOpenDay }: MesPageProps) {
   const [modal, setModal] = useState<ModalState>(null)
+  const [cleanupOpen, setCleanupOpen] = useState(false)
   const { handleMoveItem, handleToggleDone, handleAddSubtask } = useItemActions(planner)
   const today = todayId()
 
@@ -79,18 +91,26 @@ export function MesPage({ planner, month, onMonthChange, onOpenRetrospectiva, on
           const isToday = dayId === today
           const dayItems = itemsForDay(planner.items, dayId)
           const dayNum = Number(dayId.slice(-2))
-          const habitItems = HABIT_ORDER.map((h) => planner.items.find((it) => it.dayId === dayId && it.habit === h)).filter(
-            (it): it is Item => Boolean(it),
-          )
+          const pending = isPastDay(dayId) && hasPendingTasks(planner.items, dayId)
           return (
-            <div key={dayId} className={cn('flex gap-2 border-b border-line px-2 py-1.5 last:border-0', isToday && 'bg-accent-soft/40')}>
+            <div
+              key={dayId}
+              className={cn(
+                'flex gap-2 border-b border-line px-2 py-1.5 last:border-0',
+                isToday && 'bg-accent-soft/40',
+                pending && 'border-l-2 border-l-attention',
+              )}
+            >
               <button
                 type="button"
                 onClick={() => isPastDay(dayId) && onOpenDay(dayId)}
                 disabled={!isPastDay(dayId)}
                 className={cn('w-12 shrink-0 text-left', isPastDay(dayId) && 'cursor-pointer hover:underline')}
+                title={pending ? 'tem pendentes' : undefined}
               >
-                <p className={cn('font-mono text-xs', isToday ? 'font-semibold text-accent' : 'text-ink-dim')}>{dayNum}</p>
+                <p className={cn('font-mono text-xs', isToday ? 'font-semibold text-accent' : pending ? 'text-attention' : 'text-ink-dim')}>
+                  {dayNum}
+                </p>
                 <p className="font-mono text-[9px] uppercase text-ink-faint">{weekdayOf(dayId)}</p>
               </button>
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -108,14 +128,6 @@ export function MesPage({ planner, month, onMonthChange, onOpenRetrospectiva, on
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {habitItems.length > 0 && (
-                  <div className="flex gap-0.5">
-                    {habitItems.map((it) => {
-                      const Icon = HABIT_ICON[it.habit!]
-                      return <Icon key={it.id} className={cn('size-2.5', it.done ? 'text-done' : 'text-ink-faint/50')} />
-                    })}
-                  </div>
-                )}
                 <button
                   type="button"
                   onClick={() => setModal({ type: 'new', dayId })}
@@ -130,13 +142,24 @@ export function MesPage({ planner, month, onMonthChange, onOpenRetrospectiva, on
         })}
       </div>
 
-      <button
-        type="button"
-        onClick={() => onOpenRetrospectiva(month)}
-        className="self-end rounded-sm border border-line px-2 py-1 text-xs text-ink-dim hover:border-line-strong hover:text-ink"
-      >
-        ver retrospectiva de {monthLabel(month)} →
-      </button>
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => setCleanupOpen(true)}
+          className="rounded-sm border border-line px-2 py-1 text-xs text-ink-dim hover:border-line-strong hover:text-ink"
+        >
+          revisar itens antigos…
+        </button>
+        <button
+          type="button"
+          onClick={() => onOpenRetrospectiva(month)}
+          className="rounded-sm border border-line px-2 py-1 text-xs text-ink-dim hover:border-line-strong hover:text-ink"
+        >
+          ver retrospectiva de {monthLabel(month)} →
+        </button>
+      </div>
+
+      {cleanupOpen && <CleanupWizard planner={planner} onClose={() => setCleanupOpen(false)} />}
 
       <EditItemModal
         state={modal}
