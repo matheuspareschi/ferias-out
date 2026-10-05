@@ -3,7 +3,7 @@ export interface Day {
   weekday: string // "qui"
 }
 
-export type HabitId = 'devocional' | 'alongamento' | 'leitura' | 'exercicio' | 'revisao'
+export type HabitId = 'devocional' | 'alongamento' | 'leitura' | 'exercicio' | 'revisao' | 'sem_internet'
 
 export type DayCategoryId = 'piedade' | 'lazer' | 'geral' | 'estudo' | 'livre' | 'outro'
 
@@ -54,6 +54,8 @@ export interface Item {
   habit?: HabitId
   /** Mês de referência no backlog ("YYYY-MM") — só faz sentido sem dayId. */
   referenceMonth?: string
+  /** Semana ISO de referência no backlog ("YYYY-Www") — alternativa a `referenceMonth`, só faz sentido sem dayId. */
+  referenceWeek?: string
   /** Dia de origem da última migração — mostra o símbolo `>`. */
   migratedFrom?: string
   /**

@@ -18,7 +18,7 @@ import type {
   Unit,
 } from './types'
 
-export const CURRENT_SCHEMA_VERSION = 4 as const
+export const CURRENT_SCHEMA_VERSION = 5 as const
 
 export interface PlannerState {
   schemaVersion: typeof CURRENT_SCHEMA_VERSION
@@ -319,19 +319,36 @@ function migrateV2ToV3(v2: PlannerStateV2): PlannerStateV3 {
 }
 
 // ---------------------------------------------------------------------------
-// v3 → v4 (atual): adiciona Projetos (GAEB/Conexão/Acampamento/Estágio) e
+// v3 → v4: adiciona Projetos (GAEB/Conexão/Acampamento/Estágio) e
 // Retrospectiva mensal — nenhum Item existente muda, só ganha campos
 // opcionais novos (endDayId, googleEventId, googleUpdated, fromGoogle, pro
 // uso futuro do Google Agenda, fase 4).
 // ---------------------------------------------------------------------------
 
+interface PlannerStateV4 {
+  schemaVersion: 4
+  items: Item[]
+  contexts: Context[]
+  dayMeta: Record<string, DayMeta>
+  anchorDayId: string
+  disciplines: Discipline[]
+  units: Unit[]
+  facultyNotes: FacultyNotes
+  gaebIdeias: GaebIdea[]
+  gaebEncontros: GaebEncontro[]
+  projectNotes: Record<string, string>
+  estagioNotes: string
+  estagioHours: EstagioHoursEntry[]
+  retrospectives: Record<string, Retrospective>
+}
+
 /**
  * v3 → v4: entra tudo vazio — nenhuma ideia/encontro/nota/retrospectiva
  * existia antes dessa fase, não há o que migrar de dado antigo. Pura.
  */
-function migrateV3ToV4(v3: PlannerStateV3): PlannerState {
+function migrateV3ToV4(v3: PlannerStateV3): PlannerStateV4 {
   return {
-    schemaVersion: CURRENT_SCHEMA_VERSION,
+    schemaVersion: 4,
     items: v3.items,
     contexts: v3.contexts,
     dayMeta: v3.dayMeta,
@@ -346,6 +363,19 @@ function migrateV3ToV4(v3: PlannerStateV3): PlannerState {
     estagioHours: [],
     retrospectives: {},
   }
+}
+
+// ---------------------------------------------------------------------------
+// v4 → v5 (atual): adiciona o hábito "sem_internet" e `referenceWeek` em
+// Item (2.3.1, backlog por semana) — nenhum dado existente muda, só ganham
+// campos/valores possíveis novos. O hábito novo só passa a existir de fato
+// quando `ensureDailyHabits` o criar pra algum dia visitado; nada aqui cria
+// itens de hábito retroativamente.
+// ---------------------------------------------------------------------------
+
+/** v4 → v5: passthrough puro — nada muda nos dados, só o formato aceita os campos novos. */
+function migrateV4ToV5(v4: PlannerStateV4): PlannerState {
+  return { ...v4, schemaVersion: CURRENT_SCHEMA_VERSION }
 }
 
 function isLegacyV0(parsed: Record<string, unknown>): boolean {
@@ -368,6 +398,7 @@ function normalizeItem(raw: Partial<Item>): Item | null {
     done: raw.done ?? false,
     habit: raw.habit,
     referenceMonth: raw.referenceMonth,
+    referenceWeek: raw.referenceWeek,
     migratedFrom: raw.migratedFrom,
     parentId: raw.parentId,
     unitId: raw.unitId,
@@ -397,7 +428,7 @@ function normalizeUnit(raw: Partial<Unit>): Unit | null {
 /**
  * Ponto único de entrada pra carregar um blob salvo (localStorage ou
  * Supabase) — decide se já está no formato atual ou encadeia as migrações
- * necessárias (v0→v1→v2→v3). Retorna `null` se o formato for irreconhecível
+ * necessárias (v0→v1→v2→v3→v4→v5). Retorna `null` se o formato for irreconhecível
  * (cai pro seed).
  */
 export function normalizeState(parsed: unknown): PlannerState | null {
@@ -442,20 +473,24 @@ export function normalizeState(parsed: unknown): PlannerState | null {
     }
   }
 
+  if (obj.schemaVersion === 4) {
+    return migrateV4ToV5(obj as unknown as PlannerStateV4)
+  }
+
   if (obj.schemaVersion === 3) {
-    return migrateV3ToV4(obj as unknown as PlannerStateV3)
+    return migrateV4ToV5(migrateV3ToV4(obj as unknown as PlannerStateV3))
   }
 
   if (obj.schemaVersion === 2) {
-    return migrateV3ToV4(migrateV2ToV3(obj as unknown as PlannerStateV2))
+    return migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(obj as unknown as PlannerStateV2)))
   }
 
   if (obj.schemaVersion === 1) {
-    return migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(obj as unknown as PlannerStateV1)))
+    return migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(obj as unknown as PlannerStateV1))))
   }
 
   if (isLegacyV0(obj)) {
-    return migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(migrateV0ToV1(obj as LegacyStateV0))))
+    return migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(migrateV0ToV1(obj as LegacyStateV0)))))
   }
 
   return null
@@ -466,5 +501,11 @@ export function needsMigration(parsed: unknown): boolean {
   if (!parsed || typeof parsed !== 'object') return false
   const obj = parsed as Record<string, unknown>
   if (obj.schemaVersion === CURRENT_SCHEMA_VERSION) return false
-  return obj.schemaVersion === 1 || obj.schemaVersion === 2 || obj.schemaVersion === 3 || isLegacyV0(obj)
+  return (
+    obj.schemaVersion === 1 ||
+    obj.schemaVersion === 2 ||
+    obj.schemaVersion === 3 ||
+    obj.schemaVersion === 4 ||
+    isLegacyV0(obj)
+  )
 }

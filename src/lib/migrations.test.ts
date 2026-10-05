@@ -269,12 +269,69 @@ describe('normalizeState — v3 (sem Projetos/Retrospectiva) → v4', () => {
   })
 })
 
+describe('normalizeState — v4 (sem referenceWeek) → v5', () => {
+  function v4State(overrides: Record<string, unknown> = {}) {
+    return {
+      schemaVersion: 4,
+      contexts: [{ id: 'pessoal', label: 'Pessoal' }],
+      dayMeta: {},
+      anchorDayId: '2026-09-25',
+      items: [{ id: 'i1', type: 'task', title: 'Lavar o carro', context: 'pessoal', order: 0, done: false }],
+      disciplines: [{ id: 'hb', sigla: 'HB', name: 'Hebraico Bíblico' }],
+      units: [],
+      facultyNotes: { general: '', byDiscipline: {} },
+      gaebIdeias: [],
+      gaebEncontros: [],
+      projectNotes: {},
+      estagioNotes: '',
+      estagioHours: [],
+      retrospectives: {},
+      ...overrides,
+    }
+  }
+
+  it('is a pure passthrough — nothing changes, items keep working without referenceWeek', () => {
+    const result = normalizeState(v4State())
+    expect(result?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(result?.items[0].referenceWeek).toBeUndefined()
+    expect(result?.gaebIdeias).toEqual([])
+  })
+
+  it('carries referenceWeek through when present', () => {
+    const result = normalizeState(
+      v4State({
+        items: [{ id: 'i1', type: 'task', title: 'Escrever relatório', context: 'pessoal', order: 0, done: false, referenceWeek: '2026-W39' }],
+      }),
+    )
+    expect(result?.items[0].referenceWeek).toBe('2026-W39')
+  })
+
+  it('chains all the way from v0 through v4', () => {
+    const fromV0 = normalizeState({ agendaItems: [], backlogItems: [], anchorDayId: '2026-09-25' })
+    expect(fromV0?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+
+    const fromV3 = normalizeState({
+      schemaVersion: 3,
+      contexts: [{ id: 'pessoal', label: 'Pessoal' }],
+      dayMeta: {},
+      anchorDayId: '2026-09-25',
+      items: [],
+      disciplines: [],
+      units: [],
+      facultyNotes: { general: '', byDiscipline: {} },
+    })
+    expect(fromV3?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(fromV3?.retrospectives).toEqual({})
+  })
+})
+
 describe('needsMigration', () => {
-  it('is true for legacy v0 shapes, v1, v2 and v3', () => {
+  it('is true for legacy v0 shapes, v1, v2, v3 and v4', () => {
     expect(needsMigration({ agendaItems: [], backlogItems: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 1, items: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 2, items: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 3, items: [], anchorDayId: '2026-09-25' })).toBe(true)
+    expect(needsMigration({ schemaVersion: 4, items: [], anchorDayId: '2026-09-25' })).toBe(true)
   })
 
   it('is false for the current shape and for garbage', () => {

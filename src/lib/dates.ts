@@ -80,3 +80,43 @@ export function lastDayOfMonth(monthId: string): string {
   const [y, m] = monthId.split('-').map(Number)
   return toDayId(y, m, daysInMonthCount(monthId))
 }
+
+/** Segunda=1 ... domingo=7 (ISO 8601), diferente de `weekdayIndexOf` (que é 0=domingo). */
+function isoWeekdayOf(dayId: string): number {
+  return ((weekdayIndexOf(dayId) + 6) % 7) + 1
+}
+
+/**
+ * Semana ISO 8601 do dia, como "YYYY-Www" — semana começa na segunda, e a
+ * semana 1 do ano é a que contém a primeira quinta-feira (equivalente a
+ * conter o dia 4 de janeiro). O "YYYY" aqui é o ano ISO, que pode diferir
+ * do ano civil do dia perto da virada do ano.
+ */
+export function isoWeekOf(dayId: string): string {
+  const { y, m, d } = parseDayId(dayId)
+  const thursday = new Date(Date.UTC(y, m - 1, d) + (4 - isoWeekdayOf(dayId)) * 86_400_000)
+  const isoYear = thursday.getUTCFullYear()
+  const jan1 = Date.UTC(isoYear, 0, 1)
+  const weekNum = Math.ceil((Math.round((thursday.getTime() - jan1) / 86_400_000) + 1) / 7)
+  return `${isoYear}-W${String(weekNum).padStart(2, '0')}`
+}
+
+/** Segunda-feira (dayId) da semana ISO "YYYY-Www". */
+export function isoWeekStart(weekId: string): string {
+  const [yearStr, weekStr] = weekId.split('-W')
+  const year = Number(yearStr)
+  const week = Number(weekStr)
+  const jan4 = toDayId(year, 1, 4)
+  const week1Monday = addDays(jan4, 1 - isoWeekdayOf(jan4))
+  return addDays(week1Monday, (week - 1) * 7)
+}
+
+/** Domingo (dayId) da semana ISO "YYYY-Www" — inclusivo, 6 dias depois da segunda. */
+export function isoWeekEnd(weekId: string): string {
+  return addDays(isoWeekStart(weekId), 6)
+}
+
+/** Soma (ou subtrai) semanas inteiras a uma semana ISO. */
+export function addIsoWeeks(weekId: string, delta: number): string {
+  return isoWeekOf(addDays(isoWeekStart(weekId), delta * 7))
+}

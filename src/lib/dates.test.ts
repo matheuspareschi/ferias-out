@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
   addDays,
+  addIsoWeeks,
   addMonths,
   compareDayIds,
   daysInMonthCount,
   firstDayOfMonth,
+  isoWeekEnd,
+  isoWeekOf,
+  isoWeekStart,
   lastDayOfMonth,
   monthIdOf,
   todayId,
@@ -81,6 +85,40 @@ describe('daysInMonthCount / firstDayOfMonth / lastDayOfMonth', () => {
     expect(firstDayOfMonth('2026-09')).toBe('2026-09-01')
     expect(lastDayOfMonth('2026-09')).toBe('2026-09-30')
     expect(lastDayOfMonth('2028-02')).toBe('2028-02-29')
+  })
+})
+
+describe('isoWeekOf / isoWeekStart / isoWeekEnd / addIsoWeeks', () => {
+  it('computes the ISO week of a plain mid-year date', () => {
+    // 2026-09-24 é uma quinta-feira — semana 21/09 (seg) a 27/09 (dom).
+    expect(isoWeekOf('2026-09-24')).toBe('2026-W39')
+  })
+
+  it('places Jan 1st in week 1 when it falls on a Thursday', () => {
+    expect(isoWeekOf('2026-01-01')).toBe('2026-W01')
+  })
+
+  it('rolls a late-December date into week 1 of the next ISO year', () => {
+    // 2025-12-31 é quarta-feira; a quinta dessa semana cai em 2026-01-01.
+    expect(isoWeekOf('2025-12-31')).toBe('2026-W01')
+  })
+
+  it('isoWeekStart/isoWeekEnd bracket the Monday..Sunday of that week', () => {
+    expect(isoWeekStart('2026-W39')).toBe('2026-09-21')
+    expect(isoWeekEnd('2026-W39')).toBe('2026-09-27')
+  })
+
+  it('every day of a week maps back to the same weekId', () => {
+    for (let i = 0; i < 7; i++) {
+      expect(isoWeekOf(addDays('2026-09-21', i))).toBe('2026-W39')
+    }
+  })
+
+  it('addIsoWeeks moves by whole weeks, including across a year boundary', () => {
+    expect(addIsoWeeks('2026-W39', 1)).toBe('2026-W40')
+    expect(addIsoWeeks('2026-W39', -1)).toBe('2026-W38')
+    // 2025 começa numa quarta (não é ano bissexto), então tem só 52 semanas ISO.
+    expect(addIsoWeeks('2026-W01', -1)).toBe('2025-W52')
   })
 })
 

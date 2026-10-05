@@ -1,7 +1,7 @@
-import { BookOpen, Flame, Footprints, PersonStanding, Search, type LucideIcon } from 'lucide-react'
+import { BookOpen, Flame, Footprints, PersonStanding, Search, WifiOff, type LucideIcon } from 'lucide-react'
 import type { HabitId } from './types'
 
-export const HABIT_ORDER: HabitId[] = ['devocional', 'alongamento', 'leitura', 'exercicio', 'revisao']
+export const HABIT_ORDER: HabitId[] = ['devocional', 'alongamento', 'leitura', 'exercicio', 'revisao', 'sem_internet']
 
 export const HABIT_ICON: Record<HabitId, LucideIcon> = {
   devocional: Flame,
@@ -9,6 +9,7 @@ export const HABIT_ICON: Record<HabitId, LucideIcon> = {
   leitura: BookOpen,
   exercicio: Footprints,
   revisao: Search,
+  sem_internet: WifiOff,
 }
 
 export const HABIT_LABEL: Record<HabitId, string> = {
@@ -17,4 +18,5 @@ export const HABIT_LABEL: Record<HabitId, string> = {
   leitura: 'Leitura',
   exercicio: 'Exercício',
   revisao: 'Revisão da faculdade',
+  sem_internet: 'Sem internet/notícias/redes',
 }

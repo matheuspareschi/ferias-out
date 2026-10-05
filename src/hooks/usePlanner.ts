@@ -3,20 +3,11 @@ import { DEFAULT_CONTEXT_ID, DEFAULT_CONTEXTS } from '@/lib/contexts'
 import { defaultAnchorDayId } from '@/lib/days'
 import { DEFAULT_DISCIPLINES } from '@/lib/disciplines'
 import { syncUnitReviews } from '@/lib/facultyReviews'
+import { HABIT_LABEL, HABIT_ORDER } from '@/lib/habits'
 import { CURRENT_SCHEMA_VERSION, needsMigration, normalizeState, type PlannerState } from '@/lib/migrations'
 import { buildSeedItems } from '@/lib/seed'
 import { SYNC_ENABLED, supabase } from '@/lib/supabaseClient'
-import type {
-  Context,
-  DayCategoryId,
-  GaebEncontro,
-  HabitId,
-  Item,
-  ItemSize,
-  LiveClassStatus,
-  Retrospective,
-  Unit,
-} from '@/lib/types'
+import type { Context, DayCategoryId, GaebEncontro, Item, ItemSize, LiveClassStatus, Retrospective, Unit } from '@/lib/types'
 
 const STORAGE_KEY = 'ferias-planner:v1'
 const BACKUP_KEY = 'ferias-planner:backup:pre-migration'
@@ -24,15 +15,6 @@ const SYNC_TABLE = 'planner_state'
 const SYNC_ROW_ID = 'default'
 
 export type SyncStatus = 'disabled' | 'syncing' | 'synced' | 'error'
-
-const HABIT_ORDER: HabitId[] = ['devocional', 'alongamento', 'leitura', 'exercicio', 'revisao']
-const HABIT_TITLE: Record<HabitId, string> = {
-  devocional: 'Devocional',
-  alongamento: 'Alongamento',
-  leitura: 'Leitura',
-  exercicio: 'Exercício',
-  revisao: 'Revisão da faculdade',
-}
 
 function newId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
@@ -72,7 +54,7 @@ function ensureDailyHabits(items: Item[], dayId: string): Item[] {
   const created: Item[] = missing.map((habit) => ({
     id: newId('item'),
     type: 'task',
-    title: HABIT_TITLE[habit],
+    title: HABIT_LABEL[habit],
     context: DEFAULT_CONTEXT_ID,
     dayId,
     period: null,
@@ -242,6 +224,7 @@ export function usePlanner() {
             | 'order'
             | 'timeNote'
             | 'referenceMonth'
+            | 'referenceWeek'
             | 'parentId'
           >
         >,
@@ -258,6 +241,7 @@ export function usePlanner() {
         order: data.order ?? 0,
         timeNote: data.timeNote,
         referenceMonth: data.referenceMonth,
+        referenceWeek: data.referenceWeek,
         parentId: data.parentId,
         done: false,
       })
