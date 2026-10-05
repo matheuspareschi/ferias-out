@@ -116,7 +116,9 @@ export function AnoPage({ planner, onOpenMonth }: AnoPageProps) {
           onDelete={
             modalState.item
               ? () => {
-                  planner.deleteItem(modalState.item!.id)
+                  const id = modalState.item!.id
+                  planner.deleteItem(id)
+                  planner.showToast('Movido para a lixeira', () => planner.restoreFromTrash(id))
                   setModalState(null)
                 }
               : undefined

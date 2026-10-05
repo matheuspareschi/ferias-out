@@ -8,6 +8,7 @@ import { MesPage } from '@/components/mes/MesPage'
 import { NavTabs, type SectionId } from '@/components/NavTabs'
 import { ProjetosPage } from '@/components/projetos/ProjetosPage'
 import { RetrospectivaPage } from '@/components/retrospectiva/RetrospectivaPage'
+import { Toast } from '@/components/Toast'
 import { useGoogleCalendar, type UseGoogleCalendarReturn } from '@/hooks/useGoogleCalendar'
 import { useGoogleSyncedPlanner } from '@/hooks/useGoogleSyncedPlanner'
 import { usePlanner } from '@/hooks/usePlanner'
@@ -175,6 +176,7 @@ export default function App() {
           <BacklogPage planner={syncedPlanner} />
         ) : null}
       </main>
+      <Toast toast={syncedPlanner.toast} onDismiss={syncedPlanner.dismissToast} />
     </div>
   )
 }

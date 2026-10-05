@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isItemVisible, recoverInvalidDates } from './itemVisibility'
+import { isItemVisible, purgeOldTrash, recoverInvalidDates } from './itemVisibility'
 import type { Item } from './types'
 
 function item(overrides: Partial<Item>): Item {
@@ -61,5 +61,29 @@ describe('recoverInvalidDates', () => {
     const twice = recoverInvalidDates(once)
     expect(twice.recoveredCount).toBe(0)
     expect(twice.items.every(isItemVisible)).toBe(true)
+  })
+})
+
+describe('purgeOldTrash', () => {
+  const now = new Date('2026-10-05T12:00:00.000Z').getTime()
+  const DAY = 24 * 60 * 60 * 1000
+
+  it('keeps trashed items within 30 days and drops anything older', () => {
+    const trash: Item[] = [
+      item({ id: 'recent', deletedAt: new Date(now - 10 * DAY).toISOString() }),
+      item({ id: 'old', deletedAt: new Date(now - 31 * DAY).toISOString() }),
+    ]
+    const kept = purgeOldTrash(trash, now)
+    expect(kept.map((it) => it.id)).toEqual(['recent'])
+  })
+
+  it('never touches an item without deletedAt', () => {
+    const trash: Item[] = [item({ id: 'no-date' })]
+    expect(purgeOldTrash(trash, now)).toBe(trash)
+  })
+
+  it('returns the same reference when nothing needs purging', () => {
+    const trash: Item[] = [item({ id: 'recent', deletedAt: new Date(now - 1 * DAY).toISOString() })]
+    expect(purgeOldTrash(trash, now)).toBe(trash)
   })
 })

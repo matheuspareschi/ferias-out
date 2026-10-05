@@ -86,6 +86,8 @@ export interface Item {
   fromGoogle?: boolean
   /** Marca um item lançado direto na visão Ano (2.4/5.2) — só esses aparecem nas caixas do Ano. */
   origem?: 'ano'
+  /** Só em itens da lixeira (1.6): quando foi excluído — base pra purgar depois de 30 dias. */
+  deletedAt?: string
 }
 
 /** Disciplina da Faculdade — sigla curta + nome completo. */

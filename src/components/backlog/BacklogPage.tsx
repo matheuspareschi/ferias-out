@@ -43,7 +43,8 @@ export function BacklogPage({ planner }: BacklogPageProps) {
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const [modal, setModal] = useState<ModalState>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const { handleMoveItem, handleToggleDone, handleAddSubtask } = useItemActions(planner)
+  const [trashOpen, setTrashOpen] = useState(false)
+  const { handleMoveItem, handleDeleteItem, handleToggleDone, handleAddSubtask } = useItemActions(planner)
 
   function toggleSelected(id: string) {
     setSelectedIds((prev) => {
@@ -235,6 +236,38 @@ export function BacklogPage({ planner }: BacklogPageProps) {
         </div>
       )}
 
+      {planner.trash.length > 0 && (
+        <div className="flex flex-col gap-1 rounded-sm border border-dashed border-line p-2">
+          <button
+            type="button"
+            onClick={() => setTrashOpen((v) => !v)}
+            className="flex items-center gap-1 px-1 font-mono text-[9px] uppercase tracking-wide text-ink-faint hover:text-ink-dim"
+          >
+            {trashOpen ? <ChevronLeft className="size-3 rotate-90" /> : <ChevronRight className="size-3" />}
+            lixeira ({planner.trash.length})
+          </button>
+          {trashOpen && (
+            <div className="flex flex-col gap-1">
+              {planner.trash
+                .slice()
+                .sort((a, b) => (b.deletedAt ?? '').localeCompare(a.deletedAt ?? ''))
+                .map((item) => (
+                  <div key={item.id} className="flex items-center justify-between gap-2 px-1 py-0.5 text-xs">
+                    <span className="min-w-0 flex-1 truncate text-ink-dim">{item.title}</span>
+                    <button
+                      type="button"
+                      onClick={() => planner.restoreFromTrash(item.id)}
+                      className="shrink-0 text-accent hover:underline"
+                    >
+                      restaurar
+                    </button>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="max-w-sm">
         <AddBacklogItemForm
           contexts={planner.contexts}
@@ -259,7 +292,7 @@ export function BacklogPage({ planner }: BacklogPageProps) {
           if (id) planner.updateItem(id, data)
           else planner.addItem({ ...data, order: Date.now() })
         }}
-        onDelete={planner.deleteItem}
+        onDelete={handleDeleteItem}
         onMove={handleMoveItem}
         onToggleItemDone={handleToggleDone}
         onAddSubtask={handleAddSubtask}

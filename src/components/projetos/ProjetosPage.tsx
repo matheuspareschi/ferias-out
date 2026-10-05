@@ -250,7 +250,7 @@ function ProjectTasksPanel({ planner, contextId, title }: { planner: UsePlannerR
   const [modal, setModal] = useState<ModalState>(null)
   const [newTitle, setNewTitle] = useState('')
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
-  const { handleMoveItem, handleToggleDone, handleAddSubtask } = useItemActions(planner)
+  const { handleMoveItem, handleDeleteItem, handleToggleDone, handleAddSubtask } = useItemActions(planner)
 
   const items = planner.items.filter((it) => it.context === contextId && !it.dayId)
   const itemIds = new Set(items.map((it) => it.id))
@@ -335,7 +335,7 @@ function ProjectTasksPanel({ planner, contextId, title }: { planner: UsePlannerR
           if (id) planner.updateItem(id, data)
           else planner.addItem({ ...data, order: Date.now() })
         }}
-        onDelete={planner.deleteItem}
+        onDelete={handleDeleteItem}
         onMove={handleMoveItem}
         onToggleItemDone={handleToggleDone}
         onAddSubtask={handleAddSubtask}

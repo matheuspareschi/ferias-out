@@ -32,7 +32,7 @@ export function HojePage({ planner }: HojePageProps) {
   const [activeDragTitle, setActiveDragTitle] = useState<string | null>(null)
   const [pendingDndId, setPendingDndId] = useState<string | null>(null)
   const [mobileTab, setMobileTab] = useState<MobileTab>('hoje')
-  const { handleMoveItem, handleToggleDone, handleAddSubtask } = useItemActions(planner)
+  const { handleMoveItem, handleDeleteItem, handleToggleDone, handleAddSubtask } = useItemActions(planner)
 
   const sensors = useSensors(
     // Mouse (desktop): arraste começa assim que o cursor se move um pouco, como antes.
@@ -253,7 +253,7 @@ export function HojePage({ planner }: HojePageProps) {
             planner.addItem({ ...data, order })
           }
         }}
-        onDelete={planner.deleteItem}
+        onDelete={handleDeleteItem}
         onMove={handleMoveItem}
         onToggleItemDone={handleToggleDone}
         onAddSubtask={handleAddSubtask}

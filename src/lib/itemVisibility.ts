@@ -32,3 +32,15 @@ export function recoverInvalidDates(items: Item[]): { items: Item[]; recoveredCo
   })
   return recoveredCount === 0 ? { items, recoveredCount: 0 } : { items: result, recoveredCount }
 }
+
+const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000
+
+/**
+ * Lixeira (1.6): itens excluídos ficam disponíveis pra restaurar por 30 dias
+ * a partir de `deletedAt`, depois são purgados de vez. Idempotente; devolve
+ * a mesma referência se nada precisar sair. Pura.
+ */
+export function purgeOldTrash(trash: Item[], now: number = Date.now()): Item[] {
+  const kept = trash.filter((it) => !it.deletedAt || now - new Date(it.deletedAt).getTime() < TRASH_RETENTION_MS)
+  return kept.length === trash.length ? trash : kept
+}

@@ -18,7 +18,7 @@ import type {
   Unit,
 } from './types'
 
-export const CURRENT_SCHEMA_VERSION = 8 as const
+export const CURRENT_SCHEMA_VERSION = 9 as const
 
 export interface PlannerState {
   schemaVersion: typeof CURRENT_SCHEMA_VERSION
@@ -39,6 +39,8 @@ export interface PlannerState {
   retrospectives: Record<string, Retrospective>
   /** Dias de DAY_LABELS que o usuário descartou na limpeza de legado (5.1). */
   dismissedDayLabels: string[]
+  /** Itens excluídos (1.6) — a lixeira, guarda por 30 dias com `deletedAt`, depois purgados. */
+  trash: Item[]
 }
 
 /** Rotina-base gravada antes da HabitStrip existir não tinha o campo `habit`. */
@@ -461,15 +463,44 @@ function migrateV6ToV7(v6: PlannerStateV6): PlannerStateV7 {
 }
 
 // ---------------------------------------------------------------------------
-// v7 → v8 (atual): adiciona `origem` em Item (2.4/5.2) — só itens lançados
-// direto na visão Ano carregam `origem: 'ano'`; os demais (criados no dia,
-// no Mês, vindos do Google ou entregas da Faculdade) ficam sem essa marca,
-// que é exatamente o que diferencia o que aparece nas caixas do Ano.
+// v7 → v8: adiciona `origem` em Item (2.4/5.2) — só itens lançados direto na
+// visão Ano carregam `origem: 'ano'`; os demais (criados no dia, no Mês,
+// vindos do Google ou entregas da Faculdade) ficam sem essa marca, que é
+// exatamente o que diferencia o que aparece nas caixas do Ano.
 // ---------------------------------------------------------------------------
 
+interface PlannerStateV8 {
+  schemaVersion: 8
+  items: Item[]
+  contexts: Context[]
+  dayMeta: Record<string, DayMeta>
+  anchorDayId: string
+  disciplines: Discipline[]
+  units: Unit[]
+  facultyNotes: FacultyNotes
+  gaebIdeias: GaebIdea[]
+  gaebEncontros: GaebEncontro[]
+  projectNotes: Record<string, Record<string, string>>
+  estagioNotes: string
+  estagioHours: EstagioHoursEntry[]
+  retrospectives: Record<string, Retrospective>
+  dismissedDayLabels: string[]
+}
+
 /** v7 → v8: passthrough puro — nenhum item existente ganha `origem` retroativamente. */
-function migrateV7ToV8(v7: PlannerStateV7): PlannerState {
-  return { ...v7, schemaVersion: CURRENT_SCHEMA_VERSION }
+function migrateV7ToV8(v7: PlannerStateV7): PlannerStateV8 {
+  return { ...v7, schemaVersion: 8 }
+}
+
+// ---------------------------------------------------------------------------
+// v8 → v9 (atual): adiciona `trash` (1.6) — exclusão vira soft-delete por 30
+// dias em vez de apagar na hora; nenhum item já excluído antes disso pode
+// ser recuperado retroativamente (já tinha sido removido de verdade).
+// ---------------------------------------------------------------------------
+
+/** v8 → v9: passthrough puro — só ganha o campo novo, vazio. */
+function migrateV8ToV9(v8: PlannerStateV8): PlannerState {
+  return { ...v8, schemaVersion: CURRENT_SCHEMA_VERSION, trash: [] }
 }
 
 function isLegacyV0(parsed: Record<string, unknown>): boolean {
@@ -506,6 +537,7 @@ function normalizeItem(raw: Partial<Item>): Item | null {
     googleUpdated: raw.googleUpdated,
     fromGoogle: raw.fromGoogle,
     origem: raw.origem,
+    deletedAt: raw.deletedAt,
   }
 }
 
@@ -555,6 +587,9 @@ export function normalizeState(parsed: unknown): PlannerState | null {
     const estagioHours = Array.isArray(obj.estagioHours) ? (obj.estagioHours as EstagioHoursEntry[]) : []
     const retrospectives = (obj.retrospectives as Record<string, Retrospective>) ?? {}
     const dismissedDayLabels = Array.isArray(obj.dismissedDayLabels) ? (obj.dismissedDayLabels as string[]) : []
+    const trash = Array.isArray(obj.trash)
+      ? (obj.trash as Partial<Item>[]).map(normalizeItem).filter((it): it is Item => it !== null)
+      : []
     return {
       schemaVersion: CURRENT_SCHEMA_VERSION,
       items,
@@ -571,39 +606,44 @@ export function normalizeState(parsed: unknown): PlannerState | null {
       estagioHours,
       retrospectives,
       dismissedDayLabels,
+      trash,
     }
   }
 
+  if (obj.schemaVersion === 8) {
+    return migrateV8ToV9(obj as unknown as PlannerStateV8)
+  }
+
   if (obj.schemaVersion === 7) {
-    return migrateV7ToV8(obj as unknown as PlannerStateV7)
+    return migrateV8ToV9(migrateV7ToV8(obj as unknown as PlannerStateV7))
   }
 
   if (obj.schemaVersion === 6) {
-    return migrateV7ToV8(migrateV6ToV7(obj as unknown as PlannerStateV6))
+    return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(obj as unknown as PlannerStateV6)))
   }
 
   if (obj.schemaVersion === 5) {
-    return migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(obj as unknown as PlannerStateV5)))
+    return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(obj as unknown as PlannerStateV5))))
   }
 
   if (obj.schemaVersion === 4) {
-    return migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(obj as unknown as PlannerStateV4))))
+    return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(obj as unknown as PlannerStateV4)))))
   }
 
   if (obj.schemaVersion === 3) {
-    return migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(obj as unknown as PlannerStateV3)))))
+    return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(obj as unknown as PlannerStateV3))))))
   }
 
   if (obj.schemaVersion === 2) {
-    return migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(obj as unknown as PlannerStateV2))))))
+    return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(obj as unknown as PlannerStateV2)))))))
   }
 
   if (obj.schemaVersion === 1) {
-    return migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(obj as unknown as PlannerStateV1)))))))
+    return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(obj as unknown as PlannerStateV1))))))))
   }
 
   if (isLegacyV0(obj)) {
-    return migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(migrateV0ToV1(obj as LegacyStateV0))))))))
+    return migrateV8ToV9(migrateV7ToV8(migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(migrateV0ToV1(obj as LegacyStateV0)))))))))
   }
 
   return null
@@ -622,6 +662,7 @@ export function needsMigration(parsed: unknown): boolean {
     obj.schemaVersion === 5 ||
     obj.schemaVersion === 6 ||
     obj.schemaVersion === 7 ||
+    obj.schemaVersion === 8 ||
     isLegacyV0(obj)
   )
 }

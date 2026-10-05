@@ -12,8 +12,22 @@ import type { Item } from '@/lib/types'
  */
 export function useItemActions(planner: UsePlannerReturn) {
   function handleMoveItem(item: Item, action: MoveAction) {
+    // Guarda os campos de posição de antes de mover, pra o "Desfazer" do toast
+    // (1.6) devolver o item exatamente de onde saiu.
+    const prevFields = {
+      dayId: item.dayId,
+      period: item.period,
+      referenceWeek: item.referenceWeek,
+      referenceMonth: item.referenceMonth,
+      migratedFrom: item.migratedFrom,
+    }
+    function undoMove() {
+      planner.updateItem(item.id, prevFields)
+    }
+
     if (action.kind === 'delete') {
       planner.deleteItem(item.id)
+      planner.showToast('Movido para a lixeira', () => planner.restoreFromTrash(item.id))
       return
     }
     // Semana / mês / sem período (2.7): nenhuma delas tem dayId, então mover
@@ -26,6 +40,7 @@ export function useItemActions(planner: UsePlannerReturn) {
         referenceMonth: undefined,
         migratedFrom: item.dayId,
       })
+      planner.showToast('Movido para o backlog da semana', undoMove)
       return
     }
     if (action.kind === 'month') {
@@ -36,6 +51,7 @@ export function useItemActions(planner: UsePlannerReturn) {
         referenceWeek: undefined,
         migratedFrom: item.dayId,
       })
+      planner.showToast('Movido para o backlog do mês', undoMove)
       return
     }
     if (action.kind === 'backlog') {
@@ -46,10 +62,20 @@ export function useItemActions(planner: UsePlannerReturn) {
         referenceMonth: undefined,
         migratedFrom: item.dayId,
       })
+      planner.showToast('Movido para "sem período"', undoMove)
       return
     }
     const dayId = action.kind === 'tomorrow' ? addDays(item.dayId ?? todayId(), 1) : action.dayId
     planner.updateItem(item.id, { dayId, period: item.period, order: Date.now(), migratedFrom: item.dayId })
+    planner.showToast(action.kind === 'tomorrow' ? 'Movido para amanhã' : 'Movido para outro dia', undoMove)
+  }
+
+  /** Exclusão direta (fora do menu de mover) — mesma lixeira + toast com desfazer (1.6). */
+  function handleDeleteItem(id: string) {
+    const item = planner.items.find((it) => it.id === id)
+    if (!item) return
+    planner.deleteItem(id)
+    planner.showToast('Movido para a lixeira', () => planner.restoreFromTrash(id))
   }
 
   function handleToggleDone(id: string) {
@@ -78,5 +104,5 @@ export function useItemActions(planner: UsePlannerReturn) {
     })
   }
 
-  return { handleMoveItem, handleToggleDone, handleAddSubtask }
+  return { handleMoveItem, handleDeleteItem, handleToggleDone, handleAddSubtask }
 }

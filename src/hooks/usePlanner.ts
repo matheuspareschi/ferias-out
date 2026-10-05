@@ -4,7 +4,7 @@ import { defaultAnchorDayId } from '@/lib/days'
 import { DEFAULT_DISCIPLINES } from '@/lib/disciplines'
 import { syncUnitReviews } from '@/lib/facultyReviews'
 import { HABIT_LABEL, HABIT_ORDER } from '@/lib/habits'
-import { recoverInvalidDates } from '@/lib/itemVisibility'
+import { purgeOldTrash, recoverInvalidDates } from '@/lib/itemVisibility'
 import { CURRENT_SCHEMA_VERSION, needsMigration, normalizeState, type PlannerState } from '@/lib/migrations'
 import { buildSeedItems } from '@/lib/seed'
 import { SYNC_ENABLED, supabase } from '@/lib/supabaseClient'
@@ -99,6 +99,7 @@ function seedState(): PlannerState {
     estagioHours: [],
     retrospectives: {},
     dismissedDayLabels: [],
+    trash: [],
   }
 }
 
@@ -124,7 +125,11 @@ function loadState(): PlannerState {
             )
           }, 0)
         }
-        return withTodayAnchor({ ...normalized, items: ensureHabitsForAllDays(recovered) })
+        return withTodayAnchor({
+          ...normalized,
+          items: ensureHabitsForAllDays(recovered),
+          trash: purgeOldTrash(normalized.trash),
+        })
       }
     }
   } catch {
@@ -133,9 +138,16 @@ function loadState(): PlannerState {
   return seedState()
 }
 
+export interface PlannerToast {
+  message: string
+  undo?: () => void
+}
+
 export function usePlanner() {
   const [state, setState] = useState<PlannerState>(loadState)
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(SYNC_ENABLED ? 'syncing' : 'disabled')
+  const [toast, setToast] = useState<PlannerToast | null>(null)
+  const toastTimerRef = useRef<number | null>(null)
   const isRemoteUpdate = useRef(false)
   // Trava os writes locais até o load inicial do Supabase resolver — sem isso, um
   // aparelho novo (só com o seed no localStorage) sobrescreveria o que já estava
@@ -160,6 +172,35 @@ export function usePlanner() {
       return items === s.items ? s : { ...s, items }
     })
   }, [state.anchorDayId])
+
+  // Purga a lixeira de itens com mais de 30 dias enquanto o app fica aberto
+  // (o load inicial já cobre a maior parte dos casos — isso pega quem deixa
+  // uma aba aberta por muito tempo).
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setState((s) => {
+        const trash = purgeOldTrash(s.trash)
+        return trash === s.trash ? s : { ...s, trash }
+      })
+    }, 60 * 60 * 1000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  const dismissToast = useCallback(() => {
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = null
+    setToast(null)
+  }, [])
+
+  /** Toast efêmero (não persistido) de "Movido para … · Desfazer" (1.6) — some sozinho depois de uns segundos. */
+  const showToast = useCallback((message: string, undo?: () => void) => {
+    if (toastTimerRef.current !== null) window.clearTimeout(toastTimerRef.current)
+    setToast({ message, undo })
+    toastTimerRef.current = window.setTimeout(() => {
+      toastTimerRef.current = null
+      setToast(null)
+    }, 6000)
+  }, [])
 
   // Sobe pro Supabase toda mudança LOCAL (ignora mudanças que vieram de lá mesmo).
   useEffect(() => {
@@ -288,14 +329,42 @@ export function usePlanner() {
     }))
   }, [])
 
-  /** Apaga o item; subtarefas dele viram itens independentes (não some o trabalho junto). */
+  /**
+   * Manda o item pra lixeira (1.6) — some dos lugares normais, mas fica
+   * restaurável por 30 dias via `restoreFromTrash`. Subtarefas dele viram
+   * itens independentes, não acompanham pra lixeira (não some o trabalho
+   * junto).
+   */
   const deleteItem = useCallback((id: string) => {
-    setState((s) => ({
-      ...s,
-      items: s.items
-        .filter((it) => it.id !== id)
-        .map((it) => (it.parentId === id ? { ...it, parentId: undefined } : it)),
-    }))
+    setState((s) => {
+      const item = s.items.find((it) => it.id === id)
+      if (!item) return s
+      return {
+        ...s,
+        items: s.items
+          .filter((it) => it.id !== id)
+          .map((it) => (it.parentId === id ? { ...it, parentId: undefined } : it)),
+        trash: [...s.trash, { ...item, deletedAt: new Date().toISOString() }],
+      }
+    })
+  }, [])
+
+  /** Devolve um item da lixeira pra "sem período" + o resto dos campos como estava ao excluir. */
+  const restoreFromTrash = useCallback((id: string) => {
+    setState((s) => {
+      const item = s.trash.find((it) => it.id === id)
+      if (!item) return s
+      return {
+        ...s,
+        trash: s.trash.filter((it) => it.id !== id),
+        items: [...s.items, { ...item, deletedAt: undefined }],
+      }
+    })
+  }, [])
+
+  /** Apaga em definitivo, sem esperar os 30 dias (visualizador da lixeira). */
+  const purgeFromTrash = useCallback((id: string) => {
+    setState((s) => ({ ...s, trash: s.trash.filter((it) => it.id !== id) }))
   }, [])
 
   /**
@@ -609,10 +678,16 @@ export function usePlanner() {
     estagioHours: state.estagioHours,
     retrospectives: state.retrospectives,
     dismissedDayLabels: state.dismissedDayLabels,
+    trash: state.trash,
+    toast,
     syncStatus,
     addItem,
     updateItem,
     deleteItem,
+    restoreFromTrash,
+    purgeFromTrash,
+    showToast,
+    dismissToast,
     toggleDone,
     setAnchorDay,
     setDayCategory,

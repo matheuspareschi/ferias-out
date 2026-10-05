@@ -73,7 +73,7 @@ function MonthItemLine({ item, onOpen }: { item: Item; onOpen: () => void }) {
 export function MesPage({ planner, month, onMonthChange, onOpenRetrospectiva, onOpenDay }: MesPageProps) {
   const [modal, setModal] = useState<ModalState>(null)
   const [cleanupOpen, setCleanupOpen] = useState(false)
-  const { handleMoveItem, handleToggleDone, handleAddSubtask } = useItemActions(planner)
+  const { handleMoveItem, handleDeleteItem, handleToggleDone, handleAddSubtask } = useItemActions(planner)
   const today = todayId()
 
   const dayCount = daysInMonthCount(month)
@@ -175,7 +175,7 @@ export function MesPage({ planner, month, onMonthChange, onOpenRetrospectiva, on
           if (id) planner.updateItem(id, data)
           else planner.addItem({ ...data, order: Date.now() })
         }}
-        onDelete={planner.deleteItem}
+        onDelete={handleDeleteItem}
         onMove={handleMoveItem}
         onToggleItemDone={handleToggleDone}
         onAddSubtask={handleAddSubtask}
