@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, MoreHorizontal } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { ItemGlyph } from '@/components/ItemGlyph'
 import { itemDndId, sortableDragStyle, usePendingDnd } from '@/lib/dnd'
+import { validateDateInput } from '@/lib/dates'
 import type { Item } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -120,6 +121,8 @@ export function ItemRow({
 function RowActionMenu({ onMove }: { onMove: (action: MoveAction) => void }) {
   const [open, setOpen] = useState(false)
   const [pickingDate, setPickingDate] = useState(false)
+  const [dateDraft, setDateDraft] = useState('')
+  const [dateError, setDateError] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -138,6 +141,18 @@ function RowActionMenu({ onMove }: { onMove: (action: MoveAction) => void }) {
     onMove(action)
     setOpen(false)
     setPickingDate(false)
+    setDateDraft('')
+    setDateError(null)
+  }
+
+  /** 1.4: só move ao confirmar, nunca a cada tecla/dígito parcial do input nativo. */
+  function confirmDate() {
+    const valid = validateDateInput(dateDraft)
+    if (!valid) {
+      setDateError('data inválida')
+      return
+    }
+    act({ kind: 'date', dayId: valid })
   }
 
   return (
@@ -156,17 +171,50 @@ function RowActionMenu({ onMove }: { onMove: (action: MoveAction) => void }) {
             amanhã
           </button>
           {pickingDate ? (
-            <input
-              type="date"
-              autoFocus
-              onChange={(e) => {
-                if (e.target.value) act({ kind: 'date', dayId: e.target.value })
-              }}
-              onBlur={() => setPickingDate(false)}
-              className="mx-2 my-1 w-[calc(100%-1rem)] rounded-sm border border-line px-1 py-0.5 text-[11px]"
-            />
+            <div className="flex flex-col gap-1 px-2 py-1">
+              {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+              <input
+                type="date"
+                autoFocus
+                value={dateDraft}
+                onChange={(e) => {
+                  setDateDraft(e.target.value)
+                  setDateError(null)
+                }}
+                className="w-full rounded-sm border border-line px-1 py-0.5 text-[11px]"
+              />
+              {dateError && <span className="font-mono text-[9px] text-attention">{dateError}</span>}
+              <div className="flex justify-end gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPickingDate(false)
+                    setDateDraft('')
+                    setDateError(null)
+                  }}
+                  className="rounded-sm px-1.5 py-0.5 text-[10px] text-ink-faint hover:text-ink"
+                >
+                  cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDate}
+                  className="rounded-sm bg-ink px-1.5 py-0.5 text-[10px] text-paper hover:bg-accent"
+                >
+                  mover
+                </button>
+              </div>
+            </div>
           ) : (
-            <button type="button" onClick={() => setPickingDate(true)} className="block w-full px-2 py-1 text-left hover:bg-paper-dim">
+            <button
+              type="button"
+              onClick={() => {
+                setPickingDate(true)
+                setDateDraft('')
+                setDateError(null)
+              }}
+              className="block w-full px-2 py-1 text-left hover:bg-paper-dim"
+            >
               outro dia…
             </button>
           )}

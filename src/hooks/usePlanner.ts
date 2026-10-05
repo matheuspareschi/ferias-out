@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_CONTEXT_ID, DEFAULT_CONTEXTS } from '@/lib/contexts'
 import { defaultAnchorDayId } from '@/lib/days'
+import { validateDateInput } from '@/lib/dates'
 import { DEFAULT_DISCIPLINES } from '@/lib/disciplines'
 import { syncUnitReviews } from '@/lib/facultyReviews'
 import { HABIT_LABEL, HABIT_ORDER } from '@/lib/habits'
@@ -81,6 +82,25 @@ function ensureHabitsForAllDays(items: Item[]): Item[] {
   return result
 }
 
+/**
+ * Recuperação (1.4/1.5): devolve pra "sem período" todo item cujo `dayId`
+ * não é uma data real ou válida (ex. ano "0002" de um bug já corrigido no
+ * seletor de data) — nenhum item fica preso numa data que o usuário nunca
+ * vai alcançar navegando. Idempotente; devolve a mesma referência se nada
+ * precisar mudar.
+ */
+function recoverInvalidDates(items: Item[]): { items: Item[]; recoveredCount: number } {
+  let recoveredCount = 0
+  const result = items.map((it) => {
+    if (it.dayId && !validateDateInput(it.dayId)) {
+      recoveredCount++
+      return { ...it, dayId: undefined, period: null }
+    }
+    return it
+  })
+  return recoveredCount === 0 ? { items, recoveredCount: 0 } : { items: result, recoveredCount }
+}
+
 function seedState(): PlannerState {
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -114,7 +134,17 @@ function loadState(): PlannerState {
       const parsed = JSON.parse(raw)
       if (needsMigration(parsed)) backupLegacyBlobIfNeeded(raw)
       const normalized = normalizeState(parsed)
-      if (normalized) return withTodayAnchor({ ...normalized, items: ensureHabitsForAllDays(normalized.items) })
+      if (normalized) {
+        const { items: recovered, recoveredCount } = recoverInvalidDates(normalized.items)
+        if (recoveredCount > 0) {
+          window.setTimeout(() => {
+            window.alert(
+              `${recoveredCount} item(ns) com data inválida foi(ram) devolvido(s) pra "sem período" — confira o grupo "sem período" na página Backlog.`,
+            )
+          }, 0)
+        }
+        return withTodayAnchor({ ...normalized, items: ensureHabitsForAllDays(recovered) })
+      }
     }
   } catch {
     // localStorage indisponível ou dados corrompidos — cai para o seed

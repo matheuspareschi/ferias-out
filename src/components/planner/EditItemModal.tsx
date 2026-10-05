@@ -1,6 +1,7 @@
 import { CalendarPlus, CalendarRange, Inbox, Plus, Trash2, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { ItemGlyph } from '@/components/ItemGlyph'
+import { validateDateInput } from '@/lib/dates'
 import { PERIOD_LABEL, PERIOD_ORDER } from '@/lib/periods'
 import type { Context, Item, ItemSize, ItemType, PeriodId } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -155,7 +156,21 @@ function ItemForm({
   const [newSubtask, setNewSubtask] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [pickingDate, setPickingDate] = useState(false)
+  const [dateDraft, setDateDraft] = useState('')
+  const [dateError, setDateError] = useState<string | null>(null)
   const isFaculdade = context === 'faculdade'
+
+  /** 1.4: só move ao confirmar, nunca a cada tecla/dígito parcial do input nativo. */
+  function confirmMoveDate() {
+    if (!item) return
+    const valid = validateDateInput(dateDraft)
+    if (!valid) {
+      setDateError('data inválida')
+      return
+    }
+    onMove(item, { kind: 'date', dayId: valid })
+    onClose()
+  }
 
   const children = item ? items.filter((it) => it.parentId === item.id).sort((a, b) => a.order - b.order) : []
   const parent = item?.parentId ? items.find((it) => it.id === item.parentId) : undefined
@@ -341,22 +356,48 @@ function ItemForm({
               <CalendarPlus className="size-3" /> amanhã
             </button>
             {pickingDate ? (
-              <input
-                type="date"
-                autoFocus
-                onChange={(e) => {
-                  if (e.target.value) {
-                    onMove(item, { kind: 'date', dayId: e.target.value })
-                    onClose()
-                  }
-                }}
-                onBlur={() => setPickingDate(false)}
-                className="rounded-sm border border-line px-2 py-1 text-xs"
-              />
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-1">
+                  {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
+                  <input
+                    type="date"
+                    autoFocus
+                    value={dateDraft}
+                    onChange={(e) => {
+                      setDateDraft(e.target.value)
+                      setDateError(null)
+                    }}
+                    className="rounded-sm border border-line px-2 py-1 text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={confirmMoveDate}
+                    className="rounded-sm bg-ink px-2 py-1 text-xs text-paper hover:bg-accent"
+                  >
+                    mover
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPickingDate(false)
+                      setDateDraft('')
+                      setDateError(null)
+                    }}
+                    className="px-1 text-xs text-ink-faint hover:text-ink"
+                  >
+                    cancelar
+                  </button>
+                </div>
+                {dateError && <span className="font-mono text-[10px] text-attention">{dateError}</span>}
+              </div>
             ) : (
               <button
                 type="button"
-                onClick={() => setPickingDate(true)}
+                onClick={() => {
+                  setPickingDate(true)
+                  setDateDraft('')
+                  setDateError(null)
+                }}
                 className="rounded-sm border border-line px-2 py-1 text-xs text-ink-dim hover:border-line-strong"
               >
                 outro dia…

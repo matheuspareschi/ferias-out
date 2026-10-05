@@ -120,3 +120,21 @@ export function isoWeekEnd(weekId: string): string {
 export function addIsoWeeks(weekId: string, delta: number): string {
   return isoWeekOf(addDays(isoWeekStart(weekId), delta * 7))
 }
+
+/**
+ * Valida um "YYYY-MM-DD" vindo de um `<input type="date">` antes de gravar
+ * (1.4): formato completo, data de calendário real (rejeita "2026-02-31") e
+ * ano dentro de uma faixa razoável (atual − 1 a atual + 5) — sem isso, um
+ * valor parcial digitado letra a letra (ex. ano "0002") nunca deveria ter
+ * chegado a mover um item pra lá. Retorna o próprio dayId se válido, `null`
+ * senão. Pura.
+ */
+export function validateDateInput(value: string, today: string = todayId()): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+  const { y, m, d } = parseDayId(value)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null
+  const currentYear = Number(today.slice(0, 4))
+  if (y < currentYear - 1 || y > currentYear + 5) return null
+  return value
+}

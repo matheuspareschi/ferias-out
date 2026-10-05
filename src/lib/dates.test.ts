@@ -12,6 +12,7 @@ import {
   lastDayOfMonth,
   monthIdOf,
   todayId,
+  validateDateInput,
   weekdayOf,
 } from './dates'
 
@@ -137,5 +138,37 @@ describe('todayId', () => {
     // 01:00 UTC = 22:00 do dia anterior em America/Sao_Paulo (UTC-3)
     const earlyUtc = new Date('2026-06-15T01:00:00Z')
     expect(todayId(earlyUtc)).toBe('2026-06-14')
+  })
+})
+
+describe('validateDateInput', () => {
+  const today = '2026-10-05'
+
+  it('accepts a well-formed date within range', () => {
+    expect(validateDateInput('2026-11-20', today)).toBe('2026-11-20')
+  })
+
+  it('rejects a partial/incomplete value (e.g. mid-typing)', () => {
+    expect(validateDateInput('2026-01-', today)).toBeNull()
+    expect(validateDateInput('', today)).toBeNull()
+    expect(validateDateInput('2026-1-5', today)).toBeNull()
+  })
+
+  it('rejects a bogus year typed digit by digit (e.g. "0002")', () => {
+    expect(validateDateInput('0002-01-15', today)).toBeNull()
+    expect(validateDateInput('0020-01-15', today)).toBeNull()
+  })
+
+  it('rejects a year outside [current-1, current+5]', () => {
+    expect(validateDateInput('2024-12-31', today)).toBeNull()
+    expect(validateDateInput('2032-01-01', today)).toBeNull()
+    expect(validateDateInput('2025-01-01', today)).toBe('2025-01-01')
+    expect(validateDateInput('2031-12-31', today)).toBe('2031-12-31')
+  })
+
+  it('rejects a calendar date that does not exist', () => {
+    expect(validateDateInput('2026-02-31', today)).toBeNull()
+    expect(validateDateInput('2026-13-01', today)).toBeNull()
+    expect(validateDateInput('2026-04-31', today)).toBeNull()
   })
 })
