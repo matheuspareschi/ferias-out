@@ -1,4 +1,4 @@
-import { CalendarPlus, Inbox, Plus, Trash2, X } from 'lucide-react'
+import { CalendarPlus, CalendarRange, Inbox, Plus, Trash2, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { ItemGlyph } from '@/components/ItemGlyph'
 import { PERIOD_LABEL, PERIOD_ORDER } from '@/lib/periods'
@@ -362,18 +362,36 @@ function ItemForm({
                 outro dia…
               </button>
             )}
-            {item.dayId && (
-              <button
-                type="button"
-                onClick={() => {
-                  onMove(item, { kind: 'backlog' })
-                  onClose()
-                }}
-                className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim hover:border-line-strong"
-              >
-                <Inbox className="size-3" /> voltar ao backlog
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                onMove(item, { kind: 'week' })
+                onClose()
+              }}
+              className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim hover:border-line-strong"
+            >
+              <CalendarRange className="size-3" /> backlog da semana
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onMove(item, { kind: 'month' })
+                onClose()
+              }}
+              className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim hover:border-line-strong"
+            >
+              <CalendarRange className="size-3" /> backlog do mês
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onMove(item, { kind: 'backlog' })
+                onClose()
+              }}
+              className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim hover:border-line-strong"
+            >
+              <Inbox className="size-3" /> sem período
+            </button>
           </div>
         </div>
       )}

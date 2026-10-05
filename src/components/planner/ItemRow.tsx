@@ -6,7 +6,13 @@ import { itemDndId, sortableDragStyle, usePendingDnd } from '@/lib/dnd'
 import type { Item } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
-export type MoveAction = { kind: 'tomorrow' } | { kind: 'date'; dayId: string } | { kind: 'backlog' } | { kind: 'delete' }
+export type MoveAction =
+  | { kind: 'tomorrow' }
+  | { kind: 'date'; dayId: string }
+  | { kind: 'week' }
+  | { kind: 'month' }
+  | { kind: 'backlog' }
+  | { kind: 'delete' }
 
 interface ItemRowProps {
   item: Item
@@ -164,8 +170,14 @@ function RowActionMenu({ onMove }: { onMove: (action: MoveAction) => void }) {
               outro dia…
             </button>
           )}
+          <button type="button" onClick={() => act({ kind: 'week' })} className="block w-full px-2 py-1 text-left hover:bg-paper-dim">
+            backlog da semana
+          </button>
+          <button type="button" onClick={() => act({ kind: 'month' })} className="block w-full px-2 py-1 text-left hover:bg-paper-dim">
+            backlog do mês
+          </button>
           <button type="button" onClick={() => act({ kind: 'backlog' })} className="block w-full px-2 py-1 text-left hover:bg-paper-dim">
-            voltar ao backlog
+            sem período
           </button>
           <button
             type="button"

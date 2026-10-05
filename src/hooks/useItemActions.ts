@@ -1,6 +1,6 @@
 import type { MoveAction } from '@/components/planner/ItemRow'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
-import { addDays, todayId } from '@/lib/dates'
+import { addDays, isoWeekOf, monthIdOf, todayId } from '@/lib/dates'
 import type { Item } from '@/lib/types'
 
 /**
@@ -16,8 +16,36 @@ export function useItemActions(planner: UsePlannerReturn) {
       planner.deleteItem(item.id)
       return
     }
+    // Semana / mês / sem período (2.7): nenhuma delas tem dayId, então mover
+    // entre elas nunca mexe em `migratedFrom` — só sair de um dia com data gera `>`.
+    if (action.kind === 'week') {
+      planner.updateItem(item.id, {
+        dayId: undefined,
+        period: null,
+        referenceWeek: isoWeekOf(todayId()),
+        referenceMonth: undefined,
+        migratedFrom: item.dayId,
+      })
+      return
+    }
+    if (action.kind === 'month') {
+      planner.updateItem(item.id, {
+        dayId: undefined,
+        period: null,
+        referenceMonth: monthIdOf(todayId()),
+        referenceWeek: undefined,
+        migratedFrom: item.dayId,
+      })
+      return
+    }
     if (action.kind === 'backlog') {
-      planner.updateItem(item.id, { dayId: undefined, period: null, migratedFrom: item.dayId })
+      planner.updateItem(item.id, {
+        dayId: undefined,
+        period: null,
+        referenceWeek: undefined,
+        referenceMonth: undefined,
+        migratedFrom: item.dayId,
+      })
       return
     }
     const dayId = action.kind === 'tomorrow' ? addDays(item.dayId ?? todayId(), 1) : action.dayId
