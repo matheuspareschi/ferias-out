@@ -1,14 +1,17 @@
 import { ChevronLeft, ChevronRight, Cloud, CloudOff, Download, Moon, Plug, RefreshCw, Sun, Upload } from 'lucide-react'
 import { useRef, useState, type ChangeEvent } from 'react'
+import { AnoPage } from '@/components/ano/AnoPage'
 import { ComingSoon } from '@/components/ComingSoon'
 import { DayTrail } from '@/components/DayTrail'
 import { FaculdadePage } from '@/components/faculdade/FaculdadePage'
 import { HabitosPage } from '@/components/habitos/HabitosPage'
+import { MesPage } from '@/components/mes/MesPage'
 import { NavTabs, type SectionId } from '@/components/NavTabs'
 import { PlannerBoard } from '@/components/planner/PlannerBoard'
+import { RetrospectivaPage } from '@/components/retrospectiva/RetrospectivaPage'
 import { usePlanner } from '@/hooks/usePlanner'
 import { useTheme } from '@/hooks/useTheme'
-import { addDays, todayId } from '@/lib/dates'
+import { addDays, monthIdOf, todayId } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 
 function SyncIndicator({ status }: { status: ReturnType<typeof usePlanner>['syncStatus'] }) {
@@ -47,10 +50,7 @@ const headerButtonClass =
   'flex items-center gap-1.5 rounded-sm border border-line px-2 py-1.5 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink'
 
 const COMING_SOON: Partial<Record<SectionId, { title: string; note: string }>> = {
-  mes: { title: 'Mês', note: 'Visão mensal chega na Fase 4, junto com a integração ao Google Calendar.' },
-  ano: { title: 'Ano', note: 'Visão anual chega na Fase 4, junto com a integração ao Google Calendar.' },
   backlog: { title: 'Backlog', note: 'Página cheia de backlog chega na Fase 5 — por enquanto use o painel de backlog na Semana.' },
-  retrospectiva: { title: 'Retrospectiva', note: 'Geração de retrospectiva chega na Fase 7.' },
 }
 
 export default function App() {
@@ -58,6 +58,18 @@ export default function App() {
   const { theme, toggle } = useTheme()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [section, setSection] = useState<SectionId>('semana')
+  const [mesMonth, setMesMonth] = useState(monthIdOf(todayId()))
+  const [retroMonth, setRetroMonth] = useState(monthIdOf(todayId()))
+
+  function goToMonth(month: string) {
+    setMesMonth(month)
+    setSection('mes')
+  }
+
+  function goToRetrospectiva(month: string) {
+    setRetroMonth(month)
+    setSection('retrospectiva')
+  }
 
   function handleExport() {
     const json = JSON.stringify(planner.exportState(), null, 2)
@@ -154,6 +166,12 @@ export default function App() {
           <FaculdadePage planner={planner} />
         ) : section === 'habitos' ? (
           <HabitosPage planner={planner} />
+        ) : section === 'mes' ? (
+          <MesPage planner={planner} month={mesMonth} onMonthChange={setMesMonth} onOpenRetrospectiva={goToRetrospectiva} />
+        ) : section === 'ano' ? (
+          <AnoPage planner={planner} onOpenMonth={goToMonth} />
+        ) : section === 'retrospectiva' ? (
+          <RetrospectivaPage planner={planner} month={retroMonth} onMonthChange={setRetroMonth} />
         ) : COMING_SOON[section] ? (
           <ComingSoon title={COMING_SOON[section]!.title} note={COMING_SOON[section]!.note} />
         ) : null}
