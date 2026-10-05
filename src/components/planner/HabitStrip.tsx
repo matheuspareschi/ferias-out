@@ -1,27 +1,9 @@
 import { useDraggable } from '@dnd-kit/core'
-import { BookOpen, Flame, Footprints, PersonStanding, Search, type LucideIcon } from 'lucide-react'
 import { draggableDragStyle, habitDndId, usePendingDnd } from '@/lib/dnd'
+import { HABIT_ICON, HABIT_LABEL, HABIT_ORDER } from '@/lib/habits'
 import { PERIOD_LABEL } from '@/lib/periods'
 import type { Item, HabitId } from '@/lib/types'
 import { cn } from '@/lib/utils'
-
-const HABIT_ORDER: HabitId[] = ['devocional', 'alongamento', 'leitura', 'exercicio', 'revisao']
-
-const HABIT_ICON: Record<HabitId, LucideIcon> = {
-  devocional: Flame,
-  alongamento: PersonStanding,
-  leitura: BookOpen,
-  exercicio: Footprints,
-  revisao: Search,
-}
-
-const HABIT_LABEL: Record<HabitId, string> = {
-  devocional: 'Devocional',
-  alongamento: 'Alongamento',
-  leitura: 'Leitura',
-  exercicio: 'Exercício',
-  revisao: 'Revisão da faculdade',
-}
 
 interface HabitStripProps {
   items: Item[]
