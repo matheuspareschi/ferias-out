@@ -2,9 +2,13 @@ import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { BlurSavedInput, BlurSavedTextarea } from '@/components/BlurSavedField'
 import { FaculdadePage } from '@/components/faculdade/FaculdadePage'
+import { EditItemModal, type ModalState } from '@/components/planner/EditItemModal'
+import { ItemRow } from '@/components/planner/ItemRow'
+import { useItemActions } from '@/hooks/useItemActions'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
 import { addMonths, monthIdOf, todayId } from '@/lib/dates'
 import { monthWeeks } from '@/lib/habitGrid'
+import type { Item } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 interface ProjetosPageProps {
@@ -44,12 +48,12 @@ export function ProjetosPage({ planner }: ProjetosPageProps) {
           </button>
         ))}
       </aside>
-      <div className="min-w-0 flex-1 overflow-y-auto pb-4">
-        {project === 'faculdade' && <FaculdadePage planner={planner} />}
-        {project === 'gaeb' && <GaebPage planner={planner} />}
-        {project === 'conexao' && <ProjectNotesPage planner={planner} contextId="conexao" title="Conexão" />}
-        {project === 'acampamento' && <ProjectNotesPage planner={planner} contextId="acampamento" title="Acampamento" />}
-        {project === 'estagio' && <EstagioPage planner={planner} />}
+      <div className="min-w-0 flex-1 overflow-hidden pb-4">
+        {project === 'faculdade' && <div className="h-full overflow-y-auto"><FaculdadePage planner={planner} /></div>}
+        {project === 'gaeb' && <div className="h-full overflow-y-auto"><GaebPage planner={planner} /></div>}
+        {project === 'conexao' && <ProjectPage planner={planner} contextId="conexao" title="Conexão" />}
+        {project === 'acampamento' && <ProjectPage planner={planner} contextId="acampamento" title="Acampamento" />}
+        {project === 'estagio' && <div className="h-full overflow-y-auto"><EstagioPage planner={planner} /></div>}
       </div>
     </div>
   )
@@ -197,18 +201,144 @@ function GaebPage({ planner }: { planner: UsePlannerReturn }) {
   )
 }
 
-/** Conexão e Acampamento (7): começam só como contexto de backlog + uma nota simples. */
-function ProjectNotesPage({ planner, contextId, title }: { planner: UsePlannerReturn; contextId: string; title: string }) {
+type ProjectTab = 'tarefas' | 'anotacoes'
+
+/**
+ * Conexão e Acampamento (7): dois painéis 50/50 iguais à Hoje — Tarefas
+ * (itens desse contexto, mesma fonte do Backlog) e Anotações (texto livre,
+ * blur-save per 0.1). No celular vira abas.
+ */
+function ProjectPage({ planner, contextId, title }: { planner: UsePlannerReturn; contextId: string; title: string }) {
+  const [tab, setTab] = useState<ProjectTab>('tarefas')
+
   return (
-    <div className="flex flex-col gap-3">
-      <h1 className="font-serif text-lg font-semibold">{title}</h1>
-      <p className="font-mono text-[10px] text-ink-faint">as tarefas desse contexto aparecem no Backlog, como qualquer outra</p>
-      <textarea
-        value={planner.projectNotes[contextId] ?? ''}
-        onChange={(e) => planner.setProjectNote(contextId, e.target.value)}
-        placeholder={`Anotações de ${title}…`}
-        rows={14}
-        className={cn(inputClass, 'font-serif text-sm italic text-ink-dim')}
+    <div className="flex h-full flex-col overflow-hidden rounded-md border border-line">
+      <div className="flex shrink-0 border-b border-line lg:hidden">
+        {(['tarefas', 'anotacoes'] as ProjectTab[]).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            className={cn('flex-1 py-2 text-center text-xs font-semibold uppercase tracking-wide', tab === t ? 'bg-ink text-paper' : 'text-ink-dim')}
+          >
+            {t === 'tarefas' ? 'Tarefas' : 'Anotações'}
+          </button>
+        ))}
+      </div>
+
+      <div className="flex min-h-0 flex-1 lg:flex-row">
+        <div className={cn('min-h-0 flex-1 overflow-y-auto border-line lg:block lg:w-1/2 lg:border-r', tab === 'tarefas' ? 'block' : 'hidden')}>
+          <ProjectTasksPanel planner={planner} contextId={contextId} title={title} />
+        </div>
+        <div className={cn('min-h-0 flex-1 overflow-y-auto lg:block lg:w-1/2', tab === 'anotacoes' ? 'block' : 'hidden')}>
+          <div className="flex h-full flex-col gap-2 p-3">
+            <h2 className="font-serif text-base font-semibold">Anotações</h2>
+            <BlurSavedTextarea
+              value={planner.projectNotes[contextId] ?? ''}
+              onSave={(text) => planner.setProjectNote(contextId, text)}
+              placeholder={`Anotações de ${title}…`}
+              className={cn(inputClass, 'min-h-0 flex-1 resize-none font-serif text-sm italic text-ink-dim')}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ProjectTasksPanel({ planner, contextId, title }: { planner: UsePlannerReturn; contextId: string; title: string }) {
+  const [modal, setModal] = useState<ModalState>(null)
+  const [newTitle, setNewTitle] = useState('')
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
+  const { handleMoveItem, handleToggleDone, handleAddSubtask } = useItemActions(planner)
+
+  const items = planner.items.filter((it) => it.context === contextId && !it.dayId)
+  const itemIds = new Set(items.map((it) => it.id))
+  const topLevel = items.filter((it) => !it.parentId || !itemIds.has(it.parentId))
+  const pendingTop = topLevel.filter((it) => !it.done)
+  const doneTop = topLevel.filter((it) => it.done)
+
+  function childrenOf(id: string): Item[] {
+    return items.filter((it) => it.parentId === id).sort((a, b) => a.order - b.order)
+  }
+
+  function toggleCollapsed(id: string) {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function renderRow(item: Item) {
+    const children = childrenOf(item.id)
+    const progress = children.length > 0 ? { done: children.filter((c) => c.done).length, total: children.length } : undefined
+    const parent = item.parentId ? planner.items.find((it) => it.id === item.parentId) : undefined
+    const collapsed = collapsedIds.has(item.id)
+    return (
+      <div key={item.id}>
+        <ItemRow
+          item={item}
+          progress={progress}
+          collapsed={collapsed}
+          onToggleCollapsed={progress ? () => toggleCollapsed(item.id) : undefined}
+          parentTitle={parent?.title}
+          onToggleDone={() => handleToggleDone(item.id)}
+          onOpen={() => setModal({ type: 'item', item })}
+          onMove={(action) => handleMoveItem(item, action)}
+        />
+        {progress && !collapsed && <div className="flex flex-col">{children.map((c) => renderRow(c))}</div>}
+      </div>
+    )
+  }
+
+  function handleAdd(e: FormEvent) {
+    e.preventDefault()
+    if (!newTitle.trim()) return
+    planner.addItem({ type: 'task', title: newTitle.trim(), context: contextId })
+    setNewTitle('')
+  }
+
+  return (
+    <div className="flex h-full flex-col gap-3 p-3">
+      <div>
+        <h2 className="font-serif text-base font-semibold">Tarefas</h2>
+        <p className="text-xs text-ink-dim">tarefas de {title} — mesma fonte do Backlog</p>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-0.5">
+        {pendingTop.length === 0 && <p className="p-2 font-mono text-[10px] text-ink-faint">nenhuma tarefa ainda</p>}
+        {pendingTop.map((item) => renderRow(item))}
+        {doneTop.length > 0 && <div className="mt-2 flex flex-col border-t border-line pt-2">{doneTop.map((item) => renderRow(item))}</div>}
+      </div>
+
+      <form onSubmit={handleAdd} className="flex gap-1.5">
+        <input
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.target.value)}
+          placeholder={`Nova tarefa de ${title}…`}
+          className={cn(inputClass, 'flex-1 text-sm')}
+        />
+        <button type="submit" className="flex shrink-0 items-center justify-center rounded-sm border border-line px-2 text-ink-dim hover:border-line-strong" aria-label="Adicionar tarefa">
+          <Plus className="size-3.5" />
+        </button>
+      </form>
+
+      <EditItemModal
+        state={modal}
+        items={planner.items}
+        contexts={planner.contexts}
+        onClose={() => setModal(null)}
+        onAddContext={planner.addContext}
+        onSave={(id, data) => {
+          if (id) planner.updateItem(id, data)
+          else planner.addItem({ ...data, order: Date.now() })
+        }}
+        onDelete={planner.deleteItem}
+        onMove={handleMoveItem}
+        onToggleItemDone={handleToggleDone}
+        onAddSubtask={handleAddSubtask}
       />
     </div>
   )
