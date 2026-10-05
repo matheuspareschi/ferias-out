@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, Cloud, CloudOff, Download, Moon, Plug, RefreshCw, Sun, Upload } from 'lucide-react'
 import { useRef, useState, type ChangeEvent } from 'react'
 import { AnoPage } from '@/components/ano/AnoPage'
-import { ComingSoon } from '@/components/ComingSoon'
+import { BacklogPage } from '@/components/backlog/BacklogPage'
 import { DayTrail } from '@/components/DayTrail'
 import { FaculdadePage } from '@/components/faculdade/FaculdadePage'
 import { HabitosPage } from '@/components/habitos/HabitosPage'
@@ -48,10 +48,6 @@ function GoogleStatus() {
 
 const headerButtonClass =
   'flex items-center gap-1.5 rounded-sm border border-line px-2 py-1.5 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink'
-
-const COMING_SOON: Partial<Record<SectionId, { title: string; note: string }>> = {
-  backlog: { title: 'Backlog', note: 'Página cheia de backlog chega na Fase 5 — por enquanto use o painel de backlog na Semana.' },
-}
 
 export default function App() {
   const planner = usePlanner()
@@ -172,8 +168,8 @@ export default function App() {
           <AnoPage planner={planner} onOpenMonth={goToMonth} />
         ) : section === 'retrospectiva' ? (
           <RetrospectivaPage planner={planner} month={retroMonth} onMonthChange={setRetroMonth} />
-        ) : COMING_SOON[section] ? (
-          <ComingSoon title={COMING_SOON[section]!.title} note={COMING_SOON[section]!.note} />
+        ) : section === 'backlog' ? (
+          <BacklogPage planner={planner} />
         ) : null}
       </main>
     </div>
