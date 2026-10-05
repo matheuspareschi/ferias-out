@@ -47,7 +47,12 @@ function hasPendingTasks(items: Item[], dayId: string): boolean {
   return items.some((it) => it.dayId === dayId && it.type === 'task' && !it.habit && !it.done)
 }
 
-function MonthItemLine({ item, onToggleDone, onOpen }: { item: Item; onToggleDone: () => void; onOpen: () => void }) {
+/**
+ * Sem estado de conclusão no Mês (5.1): só o nome e o horário, vinculados ao
+ * dia — nunca ✕, nunca caixa de marcar, nunca risco no texto, mesmo pra uma
+ * data já passada. O Mês é só pra ver o que está ligado a cada dia.
+ */
+function MonthItemLine({ item, onOpen }: { item: Item; onOpen: () => void }) {
   return (
     <div
       role="button"
@@ -58,8 +63,8 @@ function MonthItemLine({ item, onToggleDone, onOpen }: { item: Item; onToggleDon
       }}
       className="flex w-full cursor-pointer items-center gap-1 rounded px-0.5 text-left leading-tight hover:bg-paper-dim/60"
     >
-      <ItemGlyph type={item.type} done={item.done} migrated={Boolean(item.migratedFrom)} delivery={item.isDelivery} onChange={onToggleDone} size="sm" />
-      <span className={cn('truncate text-[11px]', item.done && 'text-ink-faint line-through')}>{item.title}</span>
+      <ItemGlyph type={item.type} done={false} migrated={Boolean(item.migratedFrom)} delivery={item.isDelivery} interactive={false} onChange={() => {}} size="sm" />
+      <span className="truncate text-[11px]">{item.title}</span>
       {item.timeNote && <span className="shrink-0 font-mono text-[9px] text-ink-faint">{item.timeNote}</span>}
     </div>
   )
@@ -122,12 +127,7 @@ export function MesPage({ planner, month, onMonthChange, onOpenRetrospectiva, on
                   <span className="text-[10px] text-ink-faint">—</span>
                 ) : (
                   dayItems.map((item) => (
-                    <MonthItemLine
-                      key={item.id}
-                      item={item}
-                      onToggleDone={() => handleToggleDone(item.id)}
-                      onOpen={() => setModal({ type: 'item', item })}
-                    />
+                    <MonthItemLine key={item.id} item={item} onOpen={() => setModal({ type: 'item', item })} />
                   ))
                 )}
               </div>
