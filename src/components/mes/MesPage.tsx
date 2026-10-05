@@ -5,7 +5,7 @@ import { CleanupWizard } from '@/components/mes/CleanupWizard'
 import { EditItemModal, type ModalState } from '@/components/planner/EditItemModal'
 import { useItemActions } from '@/hooks/useItemActions'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
-import { addMonths, daysInMonthCount, todayId, weekdayOf } from '@/lib/dates'
+import { addMonths, daysInMonthCount, isoWeekOf, todayId, weekdayIndexOf, weekdayOf } from '@/lib/dates'
 import { isPastDay } from '@/lib/days'
 import type { Item } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -92,11 +92,14 @@ export function MesPage({ planner, month, onMonthChange, onOpenRetrospectiva, on
           const dayItems = itemsForDay(planner.items, dayId)
           const dayNum = Number(dayId.slice(-2))
           const pending = isPastDay(dayId) && hasPendingTasks(planner.items, dayId)
+          // Domingo abre um bloco de semana novo (5.1): traço superior mais forte + tom discreto.
+          const isSunday = weekdayIndexOf(dayId) === 0
           return (
             <div
               key={dayId}
               className={cn(
                 'flex gap-2 border-b border-line px-2 py-1.5 last:border-0',
+                isSunday && !isToday && 'border-t-2 border-t-ink-dim/50 bg-paper-dim/40',
                 isToday && 'bg-accent-soft/40',
                 pending && 'border-l-2 border-l-attention',
               )}
@@ -110,6 +113,7 @@ export function MesPage({ planner, month, onMonthChange, onOpenRetrospectiva, on
               >
                 <p className={cn('font-mono text-xs', isToday ? 'font-semibold text-accent' : pending ? 'text-attention' : 'text-ink-dim')}>
                   {dayNum}
+                  {isSunday && <span className="ml-1 font-mono text-[8px] text-ink-faint">{isoWeekOf(dayId).split('-W')[1]}</span>}
                 </p>
                 <p className="font-mono text-[9px] uppercase text-ink-faint">{weekdayOf(dayId)}</p>
               </button>
