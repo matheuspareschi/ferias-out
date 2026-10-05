@@ -6,7 +6,17 @@ import { syncUnitReviews } from '@/lib/facultyReviews'
 import { CURRENT_SCHEMA_VERSION, needsMigration, normalizeState, type PlannerState } from '@/lib/migrations'
 import { buildSeedItems } from '@/lib/seed'
 import { SYNC_ENABLED, supabase } from '@/lib/supabaseClient'
-import type { Context, DayCategoryId, HabitId, Item, ItemSize, LiveClassStatus, Unit } from '@/lib/types'
+import type {
+  Context,
+  DayCategoryId,
+  GaebEncontro,
+  HabitId,
+  Item,
+  ItemSize,
+  LiveClassStatus,
+  Retrospective,
+  Unit,
+} from '@/lib/types'
 
 const STORAGE_KEY = 'ferias-planner:v1'
 const BACKUP_KEY = 'ferias-planner:backup:pre-migration'
@@ -224,7 +234,15 @@ export function usePlanner() {
         Partial<
           Pick<
             Item,
-            'context' | 'size' | 'dayId' | 'period' | 'order' | 'timeNote' | 'referenceMonth' | 'parentId'
+            | 'context'
+            | 'size'
+            | 'dayId'
+            | 'endDayId'
+            | 'period'
+            | 'order'
+            | 'timeNote'
+            | 'referenceMonth'
+            | 'parentId'
           >
         >,
     ) => {
@@ -235,6 +253,7 @@ export function usePlanner() {
         context: data.context ?? DEFAULT_CONTEXT_ID,
         size: data.size,
         dayId: data.dayId,
+        endDayId: data.endDayId,
         period: data.period ?? null,
         order: data.order ?? 0,
         timeNote: data.timeNote,
@@ -484,6 +503,64 @@ export function usePlanner() {
     }))
   }, [])
 
+  const addGaebIdea = useCallback((text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+    setState((s) => ({ ...s, gaebIdeias: [...s.gaebIdeias, { id: newId('ideia'), text: trimmed }] }))
+  }, [])
+
+  const deleteGaebIdea = useCallback((id: string) => {
+    setState((s) => ({ ...s, gaebIdeias: s.gaebIdeias.filter((i) => i.id !== id) }))
+  }, [])
+
+  /** Cria ou atualiza o encontro do dia (um por dia) — usado pelo calendário pequeno do GAEB. */
+  const upsertGaebEncontro = useCallback(
+    (dayId: string, patch: Partial<Pick<GaebEncontro, 'comments' | 'tema' | 'pessoas' | 'comida'>>) => {
+      setState((s) => {
+        const existing = s.gaebEncontros.find((e) => e.dayId === dayId)
+        if (existing) {
+          return { ...s, gaebEncontros: s.gaebEncontros.map((e) => (e.dayId === dayId ? { ...e, ...patch } : e)) }
+        }
+        return {
+          ...s,
+          gaebEncontros: [...s.gaebEncontros, { id: newId('encontro'), dayId, comments: '', ...patch }],
+        }
+      })
+    },
+    [],
+  )
+
+  const deleteGaebEncontro = useCallback((dayId: string) => {
+    setState((s) => ({ ...s, gaebEncontros: s.gaebEncontros.filter((e) => e.dayId !== dayId) }))
+  }, [])
+
+  /** Nota simples por contexto de projeto (hoje: conexao, acampamento). */
+  const setProjectNote = useCallback((contextId: string, text: string) => {
+    setState((s) => ({ ...s, projectNotes: { ...s.projectNotes, [contextId]: text } }))
+  }, [])
+
+  const setEstagioNotes = useCallback((text: string) => {
+    setState((s) => ({ ...s, estagioNotes: text }))
+  }, [])
+
+  const addEstagioHours = useCallback((activity: string, hours: number) => {
+    const trimmed = activity.trim()
+    if (!trimmed || !Number.isFinite(hours) || hours <= 0) return
+    setState((s) => ({ ...s, estagioHours: [...s.estagioHours, { id: newId('horas'), activity: trimmed, hours }] }))
+  }, [])
+
+  const deleteEstagioHours = useCallback((id: string) => {
+    setState((s) => ({ ...s, estagioHours: s.estagioHours.filter((h) => h.id !== id) }))
+  }, [])
+
+  /** Mês no formato "YYYY-MM" — cria a retrospectiva na primeira edição. */
+  const setRetrospective = useCallback((month: string, patch: Partial<Retrospective>) => {
+    setState((s) => {
+      const current: Retrospective = s.retrospectives[month] ?? { from: '', alive: '', wantToAppear: '' }
+      return { ...s, retrospectives: { ...s.retrospectives, [month]: { ...current, ...patch } } }
+    })
+  }, [])
+
   const importState = useCallback((json: string): boolean => {
     try {
       const normalized = normalizeState(JSON.parse(json))
@@ -503,6 +580,12 @@ export function usePlanner() {
     disciplines: state.disciplines,
     units: state.units,
     facultyNotes: state.facultyNotes,
+    gaebIdeias: state.gaebIdeias,
+    gaebEncontros: state.gaebEncontros,
+    projectNotes: state.projectNotes,
+    estagioNotes: state.estagioNotes,
+    estagioHours: state.estagioHours,
+    retrospectives: state.retrospectives,
     syncStatus,
     addItem,
     updateItem,
@@ -522,6 +605,15 @@ export function usePlanner() {
     addLiveClass,
     setLiveClassStatus,
     setFacultyNote,
+    addGaebIdea,
+    deleteGaebIdea,
+    upsertGaebEncontro,
+    deleteGaebEncontro,
+    setProjectNote,
+    setEstagioNotes,
+    addEstagioHours,
+    deleteEstagioHours,
+    setRetrospective,
     /** Estado completo, pronto pra `JSON.stringify` num botão de exportar. */
     exportState: () => state,
     importState,
