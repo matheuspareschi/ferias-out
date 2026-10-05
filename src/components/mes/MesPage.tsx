@@ -61,10 +61,10 @@ function MonthItemLine({ item, onOpen }: { item: Item; onOpen: () => void }) {
       onKeyDown={(e) => {
         if (e.key === 'Enter') onOpen()
       }}
-      className="flex w-full cursor-pointer items-center gap-1 rounded px-0.5 text-left leading-tight hover:bg-paper-dim/60"
+      className="flex max-w-[11rem] shrink-0 cursor-pointer items-center gap-1 rounded px-0.5 text-left leading-tight hover:bg-paper-dim/60"
     >
       <ItemGlyph type={item.type} done={false} migrated={Boolean(item.migratedFrom)} delivery={item.isDelivery} interactive={false} onChange={() => {}} size="sm" />
-      <span className="truncate text-[11px]">{item.title}</span>
+      <span className="truncate text-[10px]">{item.title}</span>
       {item.timeNote && <span className="shrink-0 font-mono text-[9px] text-ink-faint">{item.timeNote}</span>}
     </div>
   )
@@ -91,7 +91,7 @@ export function MesPage({ planner, month, onMonthChange, onOpenRetrospectiva, on
         </button>
       </div>
 
-      <div className="flex flex-col rounded-sm border border-line bg-paper-raised/40">
+      <div className="mx-auto flex w-full max-w-2xl flex-col rounded-sm border border-line bg-paper-raised/40">
         {days.map((dayId) => {
           const isToday = dayId === today
           const dayItems = itemsForDay(planner.items, dayId)
@@ -103,7 +103,7 @@ export function MesPage({ planner, month, onMonthChange, onOpenRetrospectiva, on
             <div
               key={dayId}
               className={cn(
-                'flex gap-2 border-b border-line px-2 py-1.5 last:border-0',
+                'flex items-center gap-2 border-b border-line px-2 py-0.5 last:border-0',
                 isSunday && !isToday && 'border-t-2 border-t-ink-dim/50 bg-paper-dim/40',
                 isToday && 'bg-accent-soft/40',
                 pending && 'border-l-2 border-l-attention',
@@ -113,16 +113,16 @@ export function MesPage({ planner, month, onMonthChange, onOpenRetrospectiva, on
                 type="button"
                 onClick={() => isPastDay(dayId) && onOpenDay(dayId)}
                 disabled={!isPastDay(dayId)}
-                className={cn('w-12 shrink-0 text-left', isPastDay(dayId) && 'cursor-pointer hover:underline')}
+                className={cn('flex w-10 shrink-0 items-baseline gap-1 text-left', isPastDay(dayId) && 'cursor-pointer hover:underline')}
                 title={pending ? 'tem pendentes' : undefined}
               >
-                <p className={cn('font-mono text-xs', isToday ? 'font-semibold text-accent' : pending ? 'text-attention' : 'text-ink-dim')}>
+                <span className={cn('font-mono text-[11px]', isToday ? 'font-semibold text-accent' : pending ? 'text-attention' : 'text-ink-dim')}>
                   {dayNum}
-                  {isSunday && <span className="ml-1 font-mono text-[8px] text-ink-faint">{isoWeekOf(dayId).split('-W')[1]}</span>}
-                </p>
-                <p className="font-mono text-[9px] uppercase text-ink-faint">{weekdayOf(dayId)}</p>
+                </span>
+                <span className="font-mono text-[8px] uppercase text-ink-faint">{weekdayOf(dayId)}</span>
+                {isSunday && <span className="font-mono text-[8px] text-ink-faint">{isoWeekOf(dayId).split('-W')[1]}</span>}
               </button>
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 py-0.5">
                 {dayItems.length === 0 ? (
                   <span className="text-[10px] text-ink-faint">—</span>
                 ) : (
