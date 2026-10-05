@@ -224,11 +224,57 @@ describe('normalizeState — v2 (sem Faculdade) → v3', () => {
   })
 })
 
+describe('normalizeState — v3 (sem Projetos/Retrospectiva) → v4', () => {
+  function v3State(overrides: Record<string, unknown> = {}) {
+    return {
+      schemaVersion: 3,
+      contexts: [{ id: 'pessoal', label: 'Pessoal' }],
+      dayMeta: {},
+      anchorDayId: '2026-09-25',
+      items: [{ id: 'i1', type: 'task', title: 'Lavar o carro', context: 'pessoal', order: 0, done: false }],
+      disciplines: [{ id: 'hb', sigla: 'HB', name: 'Hebraico Bíblico' }],
+      units: [],
+      facultyNotes: { general: '', byDiscipline: {} },
+      ...overrides,
+    }
+  }
+
+  it('starts Projetos/Retrospectiva state empty and leaves the rest untouched', () => {
+    const result = normalizeState(v3State())
+    expect(result?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(result?.gaebIdeias).toEqual([])
+    expect(result?.gaebEncontros).toEqual([])
+    expect(result?.projectNotes).toEqual({})
+    expect(result?.estagioNotes).toBe('')
+    expect(result?.estagioHours).toEqual([])
+    expect(result?.retrospectives).toEqual({})
+    expect(result?.items).toHaveLength(1)
+    expect(result?.disciplines[0].sigla).toBe('HB')
+  })
+
+  it('chains all the way from v0, v1 and v2 too', () => {
+    const fromV0 = normalizeState({ agendaItems: [], backlogItems: [], anchorDayId: '2026-09-25' })
+    expect(fromV0?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(fromV0?.retrospectives).toEqual({})
+
+    const fromV2 = normalizeState({
+      schemaVersion: 2,
+      contexts: [{ id: 'pessoal', label: 'Pessoal' }],
+      dayMeta: {},
+      anchorDayId: '2026-09-25',
+      items: [],
+    })
+    expect(fromV2?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(fromV2?.retrospectives).toEqual({})
+  })
+})
+
 describe('needsMigration', () => {
-  it('is true for legacy v0 shapes, v1 and v2', () => {
+  it('is true for legacy v0 shapes, v1, v2 and v3', () => {
     expect(needsMigration({ agendaItems: [], backlogItems: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 1, items: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 2, items: [], anchorDayId: '2026-09-25' })).toBe(true)
+    expect(needsMigration({ schemaVersion: 3, items: [], anchorDayId: '2026-09-25' })).toBe(true)
   })
 
   it('is false for the current shape and for garbage', () => {

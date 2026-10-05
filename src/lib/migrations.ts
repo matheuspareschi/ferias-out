@@ -6,15 +6,19 @@ import type {
   DayCategoryId,
   DayMeta,
   Discipline,
+  EstagioHoursEntry,
   FacultyNotes,
+  GaebEncontro,
+  GaebIdea,
   HabitId,
   Item,
   ItemSize,
   PeriodId,
+  Retrospective,
   Unit,
 } from './types'
 
-export const CURRENT_SCHEMA_VERSION = 3 as const
+export const CURRENT_SCHEMA_VERSION = 4 as const
 
 export interface PlannerState {
   schemaVersion: typeof CURRENT_SCHEMA_VERSION
@@ -25,6 +29,14 @@ export interface PlannerState {
   disciplines: Discipline[]
   units: Unit[]
   facultyNotes: FacultyNotes
+  gaebIdeias: GaebIdea[]
+  gaebEncontros: GaebEncontro[]
+  /** Notas simples por contexto de projeto (hoje: conexao, acampamento). */
+  projectNotes: Record<string, string>
+  estagioNotes: string
+  estagioHours: EstagioHoursEntry[]
+  /** Retrospectiva mensal, chaveada por "YYYY-MM". */
+  retrospectives: Record<string, Retrospective>
 }
 
 /** Rotina-base gravada antes da HabitStrip existir não tinha o campo `habit`. */
@@ -273,18 +285,29 @@ function migrateV1ToV2(v1: PlannerStateV1): PlannerStateV2 {
 }
 
 // ---------------------------------------------------------------------------
-// v2 → v3 (atual): adiciona o módulo Faculdade (disciplinas, unidades,
-// notas) — nenhum Item existente muda, só ganham os novos campos opcionais.
+// v2 → v3: adiciona o módulo Faculdade (disciplinas, unidades, notas) —
+// nenhum Item existente muda, só ganham os novos campos opcionais.
 // ---------------------------------------------------------------------------
+
+interface PlannerStateV3 {
+  schemaVersion: 3
+  items: Item[]
+  contexts: Context[]
+  dayMeta: Record<string, DayMeta>
+  anchorDayId: string
+  disciplines: Discipline[]
+  units: Unit[]
+  facultyNotes: FacultyNotes
+}
 
 /**
  * v2 → v3: entra com as disciplinas iniciais (3.1, lista editável depois) e
  * nenhuma unidade ainda — o usuário cadastra as unidades na página da
  * Faculdade. Pura.
  */
-function migrateV2ToV3(v2: PlannerStateV2): PlannerState {
+function migrateV2ToV3(v2: PlannerStateV2): PlannerStateV3 {
   return {
-    schemaVersion: CURRENT_SCHEMA_VERSION,
+    schemaVersion: 3,
     items: v2.items,
     contexts: v2.contexts,
     dayMeta: v2.dayMeta,
@@ -292,6 +315,36 @@ function migrateV2ToV3(v2: PlannerStateV2): PlannerState {
     disciplines: DEFAULT_DISCIPLINES,
     units: [],
     facultyNotes: { general: '', byDiscipline: {} },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// v3 → v4 (atual): adiciona Projetos (GAEB/Conexão/Acampamento/Estágio) e
+// Retrospectiva mensal — nenhum Item existente muda, só ganha campos
+// opcionais novos (endDayId, googleEventId, googleUpdated, fromGoogle, pro
+// uso futuro do Google Agenda, fase 4).
+// ---------------------------------------------------------------------------
+
+/**
+ * v3 → v4: entra tudo vazio — nenhuma ideia/encontro/nota/retrospectiva
+ * existia antes dessa fase, não há o que migrar de dado antigo. Pura.
+ */
+function migrateV3ToV4(v3: PlannerStateV3): PlannerState {
+  return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    items: v3.items,
+    contexts: v3.contexts,
+    dayMeta: v3.dayMeta,
+    anchorDayId: v3.anchorDayId,
+    disciplines: v3.disciplines,
+    units: v3.units,
+    facultyNotes: v3.facultyNotes,
+    gaebIdeias: [],
+    gaebEncontros: [],
+    projectNotes: {},
+    estagioNotes: '',
+    estagioHours: [],
+    retrospectives: {},
   }
 }
 
@@ -323,6 +376,10 @@ function normalizeItem(raw: Partial<Item>): Item | null {
     isDelivery: raw.isDelivery,
     disciplineId: raw.disciplineId,
     liveClassStatus: raw.liveClassStatus,
+    endDayId: raw.endDayId,
+    googleEventId: raw.googleEventId,
+    googleUpdated: raw.googleUpdated,
+    fromGoogle: raw.fromGoogle,
   }
 }
 
@@ -362,6 +419,11 @@ export function normalizeState(parsed: unknown): PlannerState | null {
         ? (obj.disciplines as Discipline[])
         : DEFAULT_DISCIPLINES
     const facultyNotes = obj.facultyNotes as Partial<FacultyNotes> | undefined
+    const gaebIdeias = Array.isArray(obj.gaebIdeias) ? (obj.gaebIdeias as GaebIdea[]) : []
+    const gaebEncontros = Array.isArray(obj.gaebEncontros) ? (obj.gaebEncontros as GaebEncontro[]) : []
+    const projectNotes = (obj.projectNotes as Record<string, string>) ?? {}
+    const estagioHours = Array.isArray(obj.estagioHours) ? (obj.estagioHours as EstagioHoursEntry[]) : []
+    const retrospectives = (obj.retrospectives as Record<string, Retrospective>) ?? {}
     return {
       schemaVersion: CURRENT_SCHEMA_VERSION,
       items,
@@ -371,19 +433,29 @@ export function normalizeState(parsed: unknown): PlannerState | null {
       disciplines,
       units,
       facultyNotes: { general: facultyNotes?.general ?? '', byDiscipline: facultyNotes?.byDiscipline ?? {} },
+      gaebIdeias,
+      gaebEncontros,
+      projectNotes,
+      estagioNotes: typeof obj.estagioNotes === 'string' ? obj.estagioNotes : '',
+      estagioHours,
+      retrospectives,
     }
   }
 
+  if (obj.schemaVersion === 3) {
+    return migrateV3ToV4(obj as unknown as PlannerStateV3)
+  }
+
   if (obj.schemaVersion === 2) {
-    return migrateV2ToV3(obj as unknown as PlannerStateV2)
+    return migrateV3ToV4(migrateV2ToV3(obj as unknown as PlannerStateV2))
   }
 
   if (obj.schemaVersion === 1) {
-    return migrateV2ToV3(migrateV1ToV2(obj as unknown as PlannerStateV1))
+    return migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(obj as unknown as PlannerStateV1)))
   }
 
   if (isLegacyV0(obj)) {
-    return migrateV2ToV3(migrateV1ToV2(migrateV0ToV1(obj as LegacyStateV0)))
+    return migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(migrateV0ToV1(obj as LegacyStateV0))))
   }
 
   return null
@@ -394,5 +466,5 @@ export function needsMigration(parsed: unknown): boolean {
   if (!parsed || typeof parsed !== 'object') return false
   const obj = parsed as Record<string, unknown>
   if (obj.schemaVersion === CURRENT_SCHEMA_VERSION) return false
-  return obj.schemaVersion === 1 || obj.schemaVersion === 2 || isLegacyV0(obj)
+  return obj.schemaVersion === 1 || obj.schemaVersion === 2 || obj.schemaVersion === 3 || isLegacyV0(obj)
 }

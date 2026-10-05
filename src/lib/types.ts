@@ -74,6 +74,14 @@ export interface Item {
   disciplineId?: string
   /** Só em aulas ao vivo (evento, contexto Faculdade): estado de presença. */
   liveClassStatus?: LiveClassStatus
+  /** Dia final, pra compromissos de vários dias (ex.: viagem) — inclusivo. Sem valor = só `dayId`. */
+  endDayId?: string
+  /** Id do evento correspondente no Google Agenda — só em eventos criados/linkados por lá (5.3). */
+  googleEventId?: string
+  /** `updated`/etag do Google na última sincronização — detecta mudança feita lá antes de sobrescrever. */
+  googleUpdated?: string
+  /** true pra um evento só-leitura vindo do Google (nunca editado por aqui). */
+  fromGoogle?: boolean
 }
 
 /** Disciplina da Faculdade — sigla curta + nome completo. */
@@ -114,4 +122,37 @@ export interface Context {
 export interface DayMeta {
   category?: DayCategoryId
   note?: string
+}
+
+/** Uma ideia solta do GAEB (painel de Ideias, 7). */
+export interface GaebIdea {
+  id: string
+  text: string
+}
+
+/**
+ * Um encontro do GAEB (7): dia marcado no calendário pequeno, com
+ * comentários em texto livre e metadados pequenos opcionais.
+ */
+export interface GaebEncontro {
+  id: string
+  dayId: string
+  comments: string
+  tema?: string
+  pessoas?: number
+  comida?: string
+}
+
+/** Uma linha da tabela opcional de horas do Estágio (7). */
+export interface EstagioHoursEntry {
+  id: string
+  activity: string
+  hours: number
+}
+
+/** Retrospectiva de um mês ("YYYY-MM") — três campos de texto livre (8). */
+export interface Retrospective {
+  from: string
+  alive: string
+  wantToAppear: string
 }

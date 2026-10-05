@@ -83,6 +83,12 @@ function seedState(): PlannerState {
     disciplines: DEFAULT_DISCIPLINES,
     units: [],
     facultyNotes: { general: '', byDiscipline: {} },
+    gaebIdeias: [],
+    gaebEncontros: [],
+    projectNotes: {},
+    estagioNotes: '',
+    estagioHours: [],
+    retrospectives: {},
   }
 }
 
