@@ -42,7 +42,26 @@ export function BacklogPage({ planner }: BacklogPageProps) {
   const [contextFilter, setContextFilter] = useState<string>(CONTEXT_ALL)
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
   const [modal, setModal] = useState<ModalState>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const { handleMoveItem, handleToggleDone, handleAddSubtask } = useItemActions(planner)
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  /** Ação em lote (seção 6): aplica a mesma ação de 2.7 em todo item selecionado, depois limpa a seleção. */
+  function applyBatch(kind: 'week' | 'month' | 'backlog') {
+    for (const id of selectedIds) {
+      const item = planner.items.find((it) => it.id === id)
+      if (item) handleMoveItem(item, { kind })
+    }
+    setSelectedIds(new Set())
+  }
 
   let backlogItems = itemsForScope(planner.items, scope, week, month)
   if (contextFilter !== CONTEXT_ALL) backlogItems = backlogItems.filter((it) => it.context === contextFilter)
@@ -68,25 +87,36 @@ export function BacklogPage({ planner }: BacklogPageProps) {
     })
   }
 
-  function renderRow(item: Item) {
+  function renderRow(item: Item, selectable = false) {
     const children = childrenOf(item.id)
     const progress = children.length > 0 ? { done: children.filter((c) => c.done).length, total: children.length } : undefined
     const parent = item.parentId ? planner.items.find((it) => it.id === item.parentId) : undefined
     const collapsed = collapsedIds.has(item.id)
     return (
-      <div key={item.id}>
-        <ItemRow
-          item={item}
-          progress={progress}
-          collapsed={collapsed}
-          onToggleCollapsed={progress ? () => toggleCollapsed(item.id) : undefined}
-          parentTitle={parent?.title}
-          sizeSuffix={item.context === 'faculdade' ? item.size : undefined}
-          onToggleDone={() => handleToggleDone(item.id)}
-          onOpen={() => setModal({ type: 'item', item })}
-          onMove={(action) => handleMoveItem(item, action)}
-        />
-        {progress && !collapsed && <div className="flex flex-col">{children.map((c) => renderRow(c))}</div>}
+      <div key={item.id} className="flex items-start gap-1">
+        {selectable && (
+          <input
+            type="checkbox"
+            checked={selectedIds.has(item.id)}
+            onChange={() => toggleSelected(item.id)}
+            className="mt-1.5 size-3 shrink-0 accent-accent"
+            aria-label={`Selecionar ${item.title}`}
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <ItemRow
+            item={item}
+            progress={progress}
+            collapsed={collapsed}
+            onToggleCollapsed={progress ? () => toggleCollapsed(item.id) : undefined}
+            parentTitle={parent?.title}
+            sizeSuffix={item.context === 'faculdade' ? item.size : undefined}
+            onToggleDone={() => handleToggleDone(item.id)}
+            onOpen={() => setModal({ type: 'item', item })}
+            onMove={(action) => handleMoveItem(item, action)}
+          />
+          {progress && !collapsed && <div className="flex flex-col">{children.map((c) => renderRow(c))}</div>}
+        </div>
       </div>
     )
   }
@@ -162,6 +192,24 @@ export function BacklogPage({ planner }: BacklogPageProps) {
         </select>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-sm border border-accent bg-accent-soft/40 px-2 py-1.5">
+          <span className="font-mono text-xs text-ink-dim">{selectedIds.size} selecionado{selectedIds.size > 1 ? 's' : ''}</span>
+          <button type="button" onClick={() => applyBatch('week')} className="rounded-sm border border-line bg-paper px-2 py-1 text-xs text-ink-dim hover:border-line-strong hover:text-ink">
+            colocar na semana
+          </button>
+          <button type="button" onClick={() => applyBatch('month')} className="rounded-sm border border-line bg-paper px-2 py-1 text-xs text-ink-dim hover:border-line-strong hover:text-ink">
+            colocar no mês
+          </button>
+          <button type="button" onClick={() => applyBatch('backlog')} className="rounded-sm border border-line bg-paper px-2 py-1 text-xs text-ink-dim hover:border-line-strong hover:text-ink">
+            tirar (sem período)
+          </button>
+          <button type="button" onClick={() => setSelectedIds(new Set())} className="ml-auto text-xs text-ink-faint hover:text-ink">
+            cancelar seleção
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col gap-3 rounded-sm border border-line bg-paper-raised/40 p-2">
         {withPeriod.length === 0 && <p className="p-2 font-mono text-[10px] text-ink-faint">nada neste período</p>}
         {periodGroups.map(({ context, items: groupItems }) => (
@@ -169,7 +217,7 @@ export function BacklogPage({ planner }: BacklogPageProps) {
             <p className="px-1 font-mono text-[9px] uppercase tracking-wide text-ink-faint">
               {context.id === '__done' ? context.label : contextLabel(planner.contexts, context.id)}
             </p>
-            {groupItems.map((item) => renderRow(item))}
+            {groupItems.map((item) => renderRow(item, true))}
           </div>
         ))}
       </div>
@@ -182,7 +230,7 @@ export function BacklogPage({ planner }: BacklogPageProps) {
               <p className="px-1 font-mono text-[9px] uppercase tracking-wide text-ink-faint">
                 {context.id === '__done' ? context.label : contextLabel(planner.contexts, context.id)}
               </p>
-              {groupItems.map((item) => renderRow(item))}
+              {groupItems.map((item) => renderRow(item, true))}
             </div>
           ))}
         </div>
