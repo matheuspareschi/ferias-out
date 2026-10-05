@@ -1,5 +1,6 @@
 import { Trash2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
+import { BlurSavedTextarea } from '@/components/BlurSavedField'
 import { ItemGlyph } from '@/components/ItemGlyph'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
 import { todayId } from '@/lib/dates'
@@ -342,9 +343,9 @@ function NotesSection({
       <h2 className="font-serif text-base font-semibold">Notas</h2>
       <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wide text-ink-faint">
         Geral
-        <textarea
+        <BlurSavedTextarea
           value={facultyNotes.general}
-          onChange={(e) => onSetFacultyNote(null, e.target.value)}
+          onSave={(text) => onSetFacultyNote(null, text)}
           rows={3}
           placeholder="Anotações livres da Faculdade…"
           className={cn(inputClass, 'font-serif text-sm italic text-ink-dim')}
@@ -361,9 +362,9 @@ function NotesSection({
               {openDiscipline === d.id ? '▾' : '▸'} notas de {d.sigla}
             </button>
             {openDiscipline === d.id && (
-              <textarea
+              <BlurSavedTextarea
                 value={facultyNotes.byDiscipline[d.id] ?? ''}
-                onChange={(e) => onSetFacultyNote(d.id, e.target.value)}
+                onSave={(text) => onSetFacultyNote(d.id, text)}
                 rows={2}
                 placeholder={`Anotações de ${d.sigla}…`}
                 className={cn(inputClass, 'mt-1 w-full font-serif text-sm italic text-ink-dim')}

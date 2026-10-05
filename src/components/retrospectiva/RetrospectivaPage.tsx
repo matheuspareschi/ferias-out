@@ -1,4 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { BlurSavedTextarea } from '@/components/BlurSavedField'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
 import { addMonths } from '@/lib/dates'
 
@@ -45,27 +46,19 @@ export function RetrospectivaPage({ planner, month, onMonthChange }: Retrospecti
 
       <label className="flex flex-col gap-1 text-xs text-ink-dim">
         De onde venho?
-        <textarea
-          value={retro.from}
-          onChange={(e) => planner.setRetrospective(month, { from: e.target.value })}
-          className={fieldClass}
-        />
+        <BlurSavedTextarea value={retro.from} onSave={(text) => planner.setRetrospective(month, { from: text })} className={fieldClass} />
       </label>
 
       <label className="flex flex-col gap-1 text-xs text-ink-dim">
         O que está vivo agora?
-        <textarea
-          value={retro.alive}
-          onChange={(e) => planner.setRetrospective(month, { alive: e.target.value })}
-          className={fieldClass}
-        />
+        <BlurSavedTextarea value={retro.alive} onSave={(text) => planner.setRetrospective(month, { alive: text })} className={fieldClass} />
       </label>
 
       <label className="flex flex-col gap-1 text-xs text-ink-dim">
         O que quero que apareça?
-        <textarea
+        <BlurSavedTextarea
           value={retro.wantToAppear}
-          onChange={(e) => planner.setRetrospective(month, { wantToAppear: e.target.value })}
+          onSave={(text) => planner.setRetrospective(month, { wantToAppear: text })}
           className={fieldClass}
         />
       </label>

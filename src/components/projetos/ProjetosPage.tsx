@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
+import { BlurSavedInput, BlurSavedTextarea } from '@/components/BlurSavedField'
 import { FaculdadePage } from '@/components/faculdade/FaculdadePage'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
 import { addMonths, monthIdOf, todayId } from '@/lib/dates'
@@ -158,30 +159,30 @@ function GaebPage({ planner }: { planner: UsePlannerReturn }) {
             <>
               <h2 className="font-serif text-xl font-semibold">{formatFullDate(selectedDay)}</h2>
               <div className="flex flex-wrap gap-2">
-                <input
+                <BlurSavedInput
                   value={selected?.tema ?? ''}
-                  onChange={(e) => planner.upsertGaebEncontro(selectedDay, { tema: e.target.value })}
+                  onSave={(text) => planner.upsertGaebEncontro(selectedDay, { tema: text })}
                   placeholder="tema (opcional)"
                   className={cn(inputClass, 'w-40')}
                 />
-                <input
-                  value={selected?.pessoas ?? ''}
-                  onChange={(e) => planner.upsertGaebEncontro(selectedDay, { pessoas: e.target.value ? Number(e.target.value) : undefined })}
+                <BlurSavedInput
+                  value={selected?.pessoas !== undefined ? String(selected.pessoas) : ''}
+                  onSave={(text) => planner.upsertGaebEncontro(selectedDay, { pessoas: text ? Number(text) : undefined })}
                   placeholder="nº de pessoas"
                   type="number"
                   min={0}
                   className={cn(inputClass, 'w-28')}
                 />
-                <input
+                <BlurSavedInput
                   value={selected?.comida ?? ''}
-                  onChange={(e) => planner.upsertGaebEncontro(selectedDay, { comida: e.target.value })}
+                  onSave={(text) => planner.upsertGaebEncontro(selectedDay, { comida: text })}
                   placeholder="comida (opcional)"
                   className={cn(inputClass, 'w-40')}
                 />
               </div>
-              <textarea
+              <BlurSavedTextarea
                 value={selected?.comments ?? ''}
-                onChange={(e) => planner.upsertGaebEncontro(selectedDay, { comments: e.target.value })}
+                onSave={(text) => planner.upsertGaebEncontro(selectedDay, { comments: text })}
                 placeholder="Comentários desse encontro…"
                 rows={10}
                 className={cn(inputClass, 'font-serif text-sm italic text-ink-dim')}
@@ -230,9 +231,9 @@ function EstagioPage({ planner }: { planner: UsePlannerReturn }) {
   return (
     <div className="flex flex-col gap-3">
       <h1 className="font-serif text-lg font-semibold">Estágio</h1>
-      <textarea
+      <BlurSavedTextarea
         value={planner.estagioNotes}
-        onChange={(e) => planner.setEstagioNotes(e.target.value)}
+        onSave={planner.setEstagioNotes}
         placeholder="Texto livre…"
         rows={10}
         className={cn(inputClass, 'font-serif text-sm italic text-ink-dim')}

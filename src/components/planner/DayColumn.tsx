@@ -1,5 +1,6 @@
 import { NotebookPen, Plus } from 'lucide-react'
 import { useState } from 'react'
+import { BlurSavedTextarea } from '@/components/BlurSavedField'
 import { WEEKDAY_LONG, dayLabel, formatDayShort, isPastDay } from '@/lib/days'
 import { itemDndId, periodContainerId } from '@/lib/dnd'
 import { PERIOD_LABEL, PERIOD_ORDER } from '@/lib/periods'
@@ -125,9 +126,9 @@ export function DayColumn({
 
       {noteOpen && (
         <div className="border-b border-line px-2.5 py-2">
-          <textarea
+          <BlurSavedTextarea
             value={meta.note ?? ''}
-            onChange={(e) => onSetNote(dayId, e.target.value)}
+            onSave={(note) => onSetNote(dayId, note)}
             placeholder="Nota livre do dia — não entra no fluxo de tarefas…"
             rows={3}
             className="w-full resize-none rounded-sm border border-line bg-paper px-2 py-1.5 font-serif text-xs italic text-ink-dim outline-none focus:border-accent"
