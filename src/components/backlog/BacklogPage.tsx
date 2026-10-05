@@ -5,7 +5,7 @@ import { EditItemModal, type ModalState } from '@/components/planner/EditItemMod
 import { ItemRow } from '@/components/planner/ItemRow'
 import { useItemActions } from '@/hooks/useItemActions'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
-import { itemsForScope, type BacklogScope } from '@/lib/backlogScope'
+import { itemsForScope, unscopedItems, type BacklogScope } from '@/lib/backlogScope'
 import { contextLabel } from '@/lib/contexts'
 import { addIsoWeeks, addMonths, isoWeekOf, isoWeekStart, monthIdOf, todayId } from '@/lib/dates'
 import type { Context, Item } from '@/lib/types'
@@ -63,15 +63,14 @@ export function BacklogPage({ planner }: BacklogPageProps) {
     setSelectedIds(new Set())
   }
 
-  let backlogItems = itemsForScope(planner.items, scope, week, month)
-  if (contextFilter !== CONTEXT_ALL) backlogItems = backlogItems.filter((it) => it.context === contextFilter)
+  let withPeriod = itemsForScope(planner.items, scope, week, month)
+  let semPeriodo = unscopedItems(planner.items)
+  if (contextFilter !== CONTEXT_ALL) {
+    withPeriod = withPeriod.filter((it) => it.context === contextFilter)
+    semPeriodo = semPeriodo.filter((it) => it.context === contextFilter)
+  }
 
-  // "sem período" (seção 6): itens sem semana nem mês de referência — já
-  // inclusos em qualquer escopo por itemsForScope, mas aparecem aqui numa
-  // seção própria em vez de misturados com os do período ativo.
-  const withPeriod = backlogItems.filter((it) => Boolean(it.referenceWeek || it.referenceMonth))
-  const semPeriodo = backlogItems.filter((it) => !it.referenceWeek && !it.referenceMonth)
-
+  const backlogItems = [...withPeriod, ...semPeriodo]
   const backlogIds = new Set(backlogItems.map((it) => it.id))
 
   function childrenOf(id: string): Item[] {

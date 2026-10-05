@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronLeft, ChevronRight, NotebookPen, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { BlurSavedTextarea } from '@/components/BlurSavedField'
-import { WEEKDAY_LONG, dayLabel, formatDayShort, isPastDay } from '@/lib/days'
+import { WEEKDAY_LONG, dayLabel, formatDayShort, isPastDay, isToday as isTodayId } from '@/lib/days'
 import { itemDndId, periodContainerId } from '@/lib/dnd'
 import { PERIOD_LABEL, PERIOD_ORDER } from '@/lib/periods'
 import type { DayCategoryId, DayMeta, Item, PeriodId } from '@/lib/types'
@@ -27,6 +27,7 @@ interface DayColumnProps {
   onAddItem: (dayId: string) => void
   onMoveItem: (item: Item, action: MoveAction) => void
   onGoPrev: () => void
+  onGoNext: () => void
   onGoToday: () => void
   /** false quando já está vendo hoje — some o botão "Hoje". */
   showTodayButton: boolean
@@ -47,12 +48,14 @@ export function DayColumn({
   onAddItem,
   onMoveItem,
   onGoPrev,
+  onGoNext,
   onGoToday,
   showTodayButton,
   dismissedDayLabels,
 }: DayColumnProps) {
   // Dias passados continuam editáveis — só ganham uma marcação informativa no cabeçalho.
   const isPast = isPastDay(dayId)
+  const isToday = isTodayId(dayId)
   const [noteOpen, setNoteOpen] = useState(false)
   const [pendingOpen, setPendingOpen] = useState(false)
   const habitItems = items.filter((it) => it.habit)
@@ -103,6 +106,16 @@ export function DayColumn({
             title="Dia anterior"
           >
             <ChevronLeft className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onGoNext}
+            disabled={isToday}
+            className="mt-0.5 shrink-0 rounded-sm p-1 text-ink-dim transition-colors hover:bg-paper-dim hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+            aria-label="Dia seguinte"
+            title="Dia seguinte"
+          >
+            <ChevronRight className="size-3.5" />
           </button>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">

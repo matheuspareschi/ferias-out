@@ -54,6 +54,10 @@ export function HojePage({ planner }: HojePageProps) {
   function goPrev() {
     planner.setAnchorDay(addDays(planner.anchorDayId, -1))
   }
+  function goNext() {
+    if (planner.anchorDayId >= todayId()) return
+    planner.setAnchorDay(addDays(planner.anchorDayId, 1))
+  }
   function goToday() {
     planner.setAnchorDay(todayId())
   }
@@ -151,9 +155,9 @@ export function HojePage({ planner }: HojePageProps) {
       }}
     >
       <PendingDndContext.Provider value={pendingDndId}>
-        <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-line lg:flex-row">
-          <div className="flex shrink-0 border-b border-line lg:hidden">
-            {(['backlog', 'hoje'] as MobileTab[]).map((tab) => (
+        <div className="flex flex-1 flex-col gap-3 overflow-hidden lg:flex-row">
+          <div className="flex shrink-0 overflow-hidden rounded-md border border-line lg:hidden">
+            {(['hoje', 'backlog'] as MobileTab[]).map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -168,19 +172,12 @@ export function HojePage({ planner }: HojePageProps) {
             ))}
           </div>
 
-          <div className={cn('min-h-0 flex-1 border-line lg:block lg:w-1/2 lg:border-r', mobileTab === 'backlog' ? 'block' : 'hidden')}>
-            <BacklogPanel
-              items={planner.items}
-              contexts={planner.contexts}
-              onToggleDone={handleToggleDone}
-              onOpen={(item) => setModal({ type: 'item', item })}
-              onAdd={(data) => planner.addItem({ type: 'task', ...data })}
-              onMoveItem={handleMoveItem}
-              onRefineToWeek={handleRefineToWeek}
-            />
-          </div>
-
-          <div className={cn('min-h-0 flex-1 overflow-y-auto lg:block lg:w-1/2', mobileTab === 'hoje' ? 'block' : 'hidden')}>
+          <div
+            className={cn(
+              'min-h-0 flex-1 overflow-y-auto rounded-md border border-line lg:block lg:w-1/2',
+              mobileTab === 'hoje' ? 'block' : 'hidden',
+            )}
+          >
             <DayColumn
               dayId={day.id}
               weekday={day.weekday}
@@ -194,9 +191,27 @@ export function HojePage({ planner }: HojePageProps) {
               onAddItem={(dayId) => setModal({ type: 'new', dayId })}
               onMoveItem={handleMoveItem}
               onGoPrev={goPrev}
+              onGoNext={goNext}
               onGoToday={goToday}
               showTodayButton={day.id !== todayId()}
               dismissedDayLabels={planner.dismissedDayLabels}
+            />
+          </div>
+
+          <div
+            className={cn(
+              'min-h-0 flex-1 overflow-hidden rounded-md border border-line lg:block lg:w-1/2',
+              mobileTab === 'backlog' ? 'block' : 'hidden',
+            )}
+          >
+            <BacklogPanel
+              items={planner.items}
+              contexts={planner.contexts}
+              onToggleDone={handleToggleDone}
+              onOpen={(item) => setModal({ type: 'item', item })}
+              onAdd={(data) => planner.addItem({ type: 'task', ...data })}
+              onMoveItem={handleMoveItem}
+              onRefineToWeek={handleRefineToWeek}
             />
           </div>
         </div>
