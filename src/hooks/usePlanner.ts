@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_CONTEXT_ID, DEFAULT_CONTEXTS } from '@/lib/contexts'
 import { defaultAnchorDayId } from '@/lib/days'
-import { validateDateInput } from '@/lib/dates'
 import { DEFAULT_DISCIPLINES } from '@/lib/disciplines'
 import { syncUnitReviews } from '@/lib/facultyReviews'
 import { HABIT_LABEL, HABIT_ORDER } from '@/lib/habits'
+import { recoverInvalidDates } from '@/lib/itemVisibility'
 import { CURRENT_SCHEMA_VERSION, needsMigration, normalizeState, type PlannerState } from '@/lib/migrations'
 import { buildSeedItems } from '@/lib/seed'
 import { SYNC_ENABLED, supabase } from '@/lib/supabaseClient'
@@ -80,25 +80,6 @@ function ensureHabitsForAllDays(items: Item[]): Item[] {
     result = ensureDailyHabits(result, dayId)
   }
   return result
-}
-
-/**
- * Recuperação (1.4/1.5): devolve pra "sem período" todo item cujo `dayId`
- * não é uma data real ou válida (ex. ano "0002" de um bug já corrigido no
- * seletor de data) — nenhum item fica preso numa data que o usuário nunca
- * vai alcançar navegando. Idempotente; devolve a mesma referência se nada
- * precisar mudar.
- */
-function recoverInvalidDates(items: Item[]): { items: Item[]; recoveredCount: number } {
-  let recoveredCount = 0
-  const result = items.map((it) => {
-    if (it.dayId && !validateDateInput(it.dayId)) {
-      recoveredCount++
-      return { ...it, dayId: undefined, period: null }
-    }
-    return it
-  })
-  return recoveredCount === 0 ? { items, recoveredCount: 0 } : { items: result, recoveredCount }
 }
 
 function seedState(): PlannerState {
