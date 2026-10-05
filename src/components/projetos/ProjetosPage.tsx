@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, Plus, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { BlurSavedInput, BlurSavedTextarea } from '@/components/BlurSavedField'
 import { FaculdadePage } from '@/components/faculdade/FaculdadePage'
+import { DatedNoteBody, DatedNotesList } from '@/components/projetos/DatedNotes'
 import { EditItemModal, type ModalState } from '@/components/planner/EditItemModal'
 import { ItemRow } from '@/components/planner/ItemRow'
 import { useItemActions } from '@/hooks/useItemActions'
@@ -184,12 +185,10 @@ function GaebPage({ planner }: { planner: UsePlannerReturn }) {
                   className={cn(inputClass, 'w-40')}
                 />
               </div>
-              <BlurSavedTextarea
-                value={selected?.comments ?? ''}
+              <DatedNoteBody
+                key={selectedDay}
+                text={selected?.comments ?? ''}
                 onSave={(text) => planner.upsertGaebEncontro(selectedDay, { comments: text })}
-                placeholder="Comentários desse encontro…"
-                rows={10}
-                className={cn(inputClass, 'font-serif text-sm italic text-ink-dim')}
               />
             </>
           ) : (
@@ -205,8 +204,8 @@ type ProjectTab = 'tarefas' | 'anotacoes'
 
 /**
  * Conexão e Acampamento (7): dois painéis 50/50 iguais à Hoje — Tarefas
- * (itens desse contexto, mesma fonte do Backlog) e Anotações (texto livre,
- * blur-save per 0.1). No celular vira abas.
+ * (itens desse contexto, mesma fonte do Backlog) e Anotações (lista de
+ * anotações datadas, componente 7.1). No celular vira abas.
  */
 function ProjectPage({ planner, contextId, title }: { planner: UsePlannerReturn; contextId: string; title: string }) {
   const [tab, setTab] = useState<ProjectTab>('tarefas')
@@ -231,13 +230,14 @@ function ProjectPage({ planner, contextId, title }: { planner: UsePlannerReturn;
           <ProjectTasksPanel planner={planner} contextId={contextId} title={title} />
         </div>
         <div className={cn('min-h-0 flex-1 overflow-y-auto lg:block lg:w-1/2', tab === 'anotacoes' ? 'block' : 'hidden')}>
-          <div className="flex h-full flex-col gap-2 p-3">
-            <h2 className="font-serif text-base font-semibold">Anotações</h2>
-            <BlurSavedTextarea
-              value={planner.projectNotes[contextId] ?? ''}
-              onSave={(text) => planner.setProjectNote(contextId, text)}
-              placeholder={`Anotações de ${title}…`}
-              className={cn(inputClass, 'min-h-0 flex-1 resize-none font-serif text-sm italic text-ink-dim')}
+          <div className="flex h-full flex-col gap-3 p-3">
+            <div>
+              <h2 className="font-serif text-base font-semibold">Anotações</h2>
+              <p className="text-xs text-ink-dim">anotações datadas de {title}, da mais recente pra mais antiga</p>
+            </div>
+            <DatedNotesList
+              notesByDay={planner.projectNotes[contextId] ?? {}}
+              onSave={(dayId, text) => planner.setProjectNote(contextId, dayId, text)}
             />
           </div>
         </div>

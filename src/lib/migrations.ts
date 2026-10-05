@@ -18,7 +18,7 @@ import type {
   Unit,
 } from './types'
 
-export const CURRENT_SCHEMA_VERSION = 6 as const
+export const CURRENT_SCHEMA_VERSION = 7 as const
 
 export interface PlannerState {
   schemaVersion: typeof CURRENT_SCHEMA_VERSION
@@ -31,8 +31,8 @@ export interface PlannerState {
   facultyNotes: FacultyNotes
   gaebIdeias: GaebIdea[]
   gaebEncontros: GaebEncontro[]
-  /** Notas simples por contexto de projeto (hoje: conexao, acampamento). */
-  projectNotes: Record<string, string>
+  /** Anotações datadas por contexto de projeto (hoje: conexao, acampamento) — "YYYY-MM-DD" → texto (7.1). */
+  projectNotes: Record<string, Record<string, string>>
   estagioNotes: string
   estagioHours: EstagioHoursEntry[]
   /** Retrospectiva mensal, chaveada por "YYYY-MM". */
@@ -398,14 +398,48 @@ function migrateV4ToV5(v4: PlannerStateV4): PlannerStateV5 {
 }
 
 // ---------------------------------------------------------------------------
-// v5 → v6 (atual): adiciona `dismissedDayLabels` pra limpeza de legado (5.1)
-// — a wizard de revisão marca tags de dia antigas (viagem/retiro/etc.) como
+// v5 → v6: adiciona `dismissedDayLabels` pra limpeza de legado (5.1) — a
+// wizard de revisão marca tags de dia antigas (viagem/retiro/etc.) como
 // descartadas sem apagar a constante DAY_LABELS. Nenhum dado existente muda.
 // ---------------------------------------------------------------------------
 
+interface PlannerStateV6 {
+  schemaVersion: 6
+  items: Item[]
+  contexts: Context[]
+  dayMeta: Record<string, DayMeta>
+  anchorDayId: string
+  disciplines: Discipline[]
+  units: Unit[]
+  facultyNotes: FacultyNotes
+  gaebIdeias: GaebIdea[]
+  gaebEncontros: GaebEncontro[]
+  projectNotes: Record<string, string>
+  estagioNotes: string
+  estagioHours: EstagioHoursEntry[]
+  retrospectives: Record<string, Retrospective>
+  dismissedDayLabels: string[]
+}
+
 /** v5 → v6: passthrough puro — só ganha o campo novo, vazio. */
-function migrateV5ToV6(v5: PlannerStateV5): PlannerState {
-  return { ...v5, schemaVersion: CURRENT_SCHEMA_VERSION, dismissedDayLabels: [] }
+function migrateV5ToV6(v5: PlannerStateV5): PlannerStateV6 {
+  return { ...v5, schemaVersion: 6, dismissedDayLabels: [] }
+}
+
+// ---------------------------------------------------------------------------
+// v6 → v7 (atual): `projectNotes` deixa de ser uma nota única por contexto e
+// vira uma anotação por data (7.1) — mesma ideia dos encontros do GAEB, só
+// que numa lista. A nota única existente (se houver) vira a anotação de hoje,
+// pra não perder o que já estava escrito.
+// ---------------------------------------------------------------------------
+
+/** v6 → v7: nota única (se não-vazia) vira a anotação datada de hoje. */
+function migrateV6ToV7(v6: PlannerStateV6): PlannerState {
+  const projectNotes: Record<string, Record<string, string>> = {}
+  for (const [contextId, text] of Object.entries(v6.projectNotes)) {
+    if (text.trim()) projectNotes[contextId] = { [todayId()]: text }
+  }
+  return { ...v6, schemaVersion: CURRENT_SCHEMA_VERSION, projectNotes }
 }
 
 function isLegacyV0(parsed: Record<string, unknown>): boolean {
@@ -482,7 +516,11 @@ export function normalizeState(parsed: unknown): PlannerState | null {
     const facultyNotes = obj.facultyNotes as Partial<FacultyNotes> | undefined
     const gaebIdeias = Array.isArray(obj.gaebIdeias) ? (obj.gaebIdeias as GaebIdea[]) : []
     const gaebEncontros = Array.isArray(obj.gaebEncontros) ? (obj.gaebEncontros as GaebEncontro[]) : []
-    const projectNotes = (obj.projectNotes as Record<string, string>) ?? {}
+    const rawProjectNotes = (obj.projectNotes as Record<string, unknown>) ?? {}
+    const projectNotes: Record<string, Record<string, string>> = {}
+    for (const [contextId, notes] of Object.entries(rawProjectNotes)) {
+      if (notes && typeof notes === 'object') projectNotes[contextId] = notes as Record<string, string>
+    }
     const estagioHours = Array.isArray(obj.estagioHours) ? (obj.estagioHours as EstagioHoursEntry[]) : []
     const retrospectives = (obj.retrospectives as Record<string, Retrospective>) ?? {}
     const dismissedDayLabels = Array.isArray(obj.dismissedDayLabels) ? (obj.dismissedDayLabels as string[]) : []
@@ -505,28 +543,32 @@ export function normalizeState(parsed: unknown): PlannerState | null {
     }
   }
 
+  if (obj.schemaVersion === 6) {
+    return migrateV6ToV7(obj as unknown as PlannerStateV6)
+  }
+
   if (obj.schemaVersion === 5) {
-    return migrateV5ToV6(obj as unknown as PlannerStateV5)
+    return migrateV6ToV7(migrateV5ToV6(obj as unknown as PlannerStateV5))
   }
 
   if (obj.schemaVersion === 4) {
-    return migrateV5ToV6(migrateV4ToV5(obj as unknown as PlannerStateV4))
+    return migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(obj as unknown as PlannerStateV4)))
   }
 
   if (obj.schemaVersion === 3) {
-    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(obj as unknown as PlannerStateV3)))
+    return migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(obj as unknown as PlannerStateV3))))
   }
 
   if (obj.schemaVersion === 2) {
-    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(obj as unknown as PlannerStateV2))))
+    return migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(obj as unknown as PlannerStateV2)))))
   }
 
   if (obj.schemaVersion === 1) {
-    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(obj as unknown as PlannerStateV1)))))
+    return migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(obj as unknown as PlannerStateV1))))))
   }
 
   if (isLegacyV0(obj)) {
-    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(migrateV0ToV1(obj as LegacyStateV0))))))
+    return migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(migrateV0ToV1(obj as LegacyStateV0)))))))
   }
 
   return null
@@ -543,6 +585,7 @@ export function needsMigration(parsed: unknown): boolean {
     obj.schemaVersion === 3 ||
     obj.schemaVersion === 4 ||
     obj.schemaVersion === 5 ||
+    obj.schemaVersion === 6 ||
     isLegacyV0(obj)
   )
 }

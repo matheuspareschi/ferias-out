@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { todayId } from './dates'
 import { CURRENT_SCHEMA_VERSION, needsMigration, normalizeState } from './migrations'
 
 describe('normalizeState — v0 (AgendaItem/BacklogItem) → v2', () => {
@@ -379,14 +380,74 @@ describe('normalizeState — v5 (sem dismissedDayLabels) → v6', () => {
   })
 })
 
+describe('normalizeState — v6 (projectNotes nota única) → v7 (anotações datadas)', () => {
+  function v6State(overrides: Record<string, unknown> = {}) {
+    return {
+      schemaVersion: 6,
+      contexts: [{ id: 'pessoal', label: 'Pessoal' }],
+      dayMeta: {},
+      anchorDayId: '2026-09-25',
+      items: [],
+      disciplines: [],
+      units: [],
+      facultyNotes: { general: '', byDiscipline: {} },
+      gaebIdeias: [],
+      gaebEncontros: [],
+      projectNotes: { conexao: 'nota antiga de conexão' },
+      estagioNotes: '',
+      estagioHours: [],
+      retrospectives: {},
+      dismissedDayLabels: [],
+      ...overrides,
+    }
+  }
+
+  it('turns a non-empty single note into a dated entry for today', () => {
+    const result = normalizeState(v6State())
+    expect(result?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(result?.projectNotes.conexao).toEqual({ [todayId()]: 'nota antiga de conexão' })
+  })
+
+  it('drops an empty/blank single note instead of creating an empty-text dated entry', () => {
+    const result = normalizeState(v6State({ projectNotes: { acampamento: '   ' } }))
+    expect(result?.projectNotes.acampamento).toBeUndefined()
+  })
+
+  it('chains all the way from v0 and v4', () => {
+    const fromV0 = normalizeState({ agendaItems: [], backlogItems: [], anchorDayId: '2026-09-25' })
+    expect(fromV0?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(fromV0?.projectNotes).toEqual({})
+
+    const fromV4 = normalizeState({
+      schemaVersion: 4,
+      contexts: [{ id: 'pessoal', label: 'Pessoal' }],
+      dayMeta: {},
+      anchorDayId: '2026-09-25',
+      items: [],
+      disciplines: [],
+      units: [],
+      facultyNotes: { general: '', byDiscipline: {} },
+      gaebIdeias: [],
+      gaebEncontros: [],
+      projectNotes: { gaeb: 'texto' },
+      estagioNotes: '',
+      estagioHours: [],
+      retrospectives: {},
+    })
+    expect(fromV4?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(fromV4?.projectNotes.gaeb).toEqual({ [todayId()]: 'texto' })
+  })
+})
+
 describe('needsMigration', () => {
-  it('is true for legacy v0 shapes, v1, v2, v3, v4 and v5', () => {
+  it('is true for legacy v0 shapes, v1, v2, v3, v4, v5 and v6', () => {
     expect(needsMigration({ agendaItems: [], backlogItems: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 1, items: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 2, items: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 3, items: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 4, items: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 5, items: [], anchorDayId: '2026-09-25' })).toBe(true)
+    expect(needsMigration({ schemaVersion: 6, items: [], anchorDayId: '2026-09-25' })).toBe(true)
   })
 
   it('is false for the current shape and for garbage', () => {

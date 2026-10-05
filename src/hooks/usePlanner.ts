@@ -535,9 +535,12 @@ export function usePlanner() {
     setState((s) => ({ ...s, gaebEncontros: s.gaebEncontros.filter((e) => e.dayId !== dayId) }))
   }, [])
 
-  /** Nota simples por contexto de projeto (hoje: conexao, acampamento). */
-  const setProjectNote = useCallback((contextId: string, text: string) => {
-    setState((s) => ({ ...s, projectNotes: { ...s.projectNotes, [contextId]: text } }))
+  /** Anotação datada por contexto de projeto (hoje: conexao, acampamento) — 7.1. */
+  const setProjectNote = useCallback((contextId: string, dayId: string, text: string) => {
+    setState((s) => ({
+      ...s,
+      projectNotes: { ...s.projectNotes, [contextId]: { ...s.projectNotes[contextId], [dayId]: text } },
+    }))
   }, [])
 
   const setEstagioNotes = useCallback((text: string) => {
