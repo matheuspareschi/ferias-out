@@ -46,24 +46,26 @@ export function ItemRow({
   onMove,
 }: ItemRowProps) {
   const dndId = itemDndId(item.id)
+  // Evento só-leitura do Google (5.3): nunca arrastável, editável ou movível por aqui.
+  const readOnly = Boolean(item.fromGoogle)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: dndId,
-    disabled,
+    disabled: disabled || readOnly,
     data: { dndId },
   })
   const isPending = usePendingDnd(dndId)
   const isSubtask = Boolean(item.parentId)
-  const meta = [item.timeNote, sizeSuffix].filter(Boolean).join(' · ')
+  const meta = [item.timeNote, sizeSuffix, readOnly ? 'Google' : undefined].filter(Boolean).join(' · ')
 
   return (
     <div
       ref={setNodeRef}
       style={sortableDragStyle(transform, transition, isDragging)}
-      {...attributes}
-      {...listeners}
+      {...(readOnly ? {} : attributes)}
+      {...(readOnly ? {} : listeners)}
       className={cn(
         'group/row relative -mx-1 flex touch-manipulation select-none items-start gap-1.5 rounded px-1 py-0.5',
-        !disabled && 'cursor-grab active:cursor-grabbing',
+        !disabled && !readOnly && 'cursor-grab active:cursor-grabbing',
         isSubtask && 'ml-4',
         'hover:bg-paper-dim/70',
         isDragging && 'z-30 bg-paper-raised shadow-lifted',
@@ -90,30 +92,40 @@ export function ItemRow({
         subtask={isSubtask}
         delivery={item.isDelivery}
         onChange={onToggleDone}
+        interactive={!readOnly}
         className={cn('mt-0.5', overdue && !item.done && 'text-attention')}
       />
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          onOpen()
-        }}
-        className="min-w-0 flex-1 text-left"
-      >
-        <span className={cn('text-[13px] leading-snug', overdue && !item.done && 'text-attention')}>
-          {parentTitle && <span className="text-ink-faint">{parentTitle} › </span>}
-          <span className={cn(progress && 'font-semibold', item.done && 'text-ink-faint line-through')}>
+      {readOnly ? (
+        <span className="min-w-0 flex-1 text-left">
+          <span className="text-[13px] leading-snug text-ink-dim">
             {item.title}
+            {meta && <span className="ml-1.5 font-mono text-[10px] font-normal text-ink-faint">{meta}</span>}
           </span>
-          {progress && (
-            <span className="ml-1 font-mono text-[10px] font-normal text-ink-faint">
-              {progress.done}/{progress.total}
-            </span>
-          )}
-          {meta && <span className="ml-1.5 font-mono text-[10px] font-normal text-ink-faint">{meta}</span>}
         </span>
-      </button>
-      <RowActionMenu onMove={onMove} />
+      ) : (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onOpen()
+          }}
+          className="min-w-0 flex-1 text-left"
+        >
+          <span className={cn('text-[13px] leading-snug', overdue && !item.done && 'text-attention')}>
+            {parentTitle && <span className="text-ink-faint">{parentTitle} › </span>}
+            <span className={cn(progress && 'font-semibold', item.done && 'text-ink-faint line-through')}>
+              {item.title}
+            </span>
+            {progress && (
+              <span className="ml-1 font-mono text-[10px] font-normal text-ink-faint">
+                {progress.done}/{progress.total}
+              </span>
+            )}
+            {meta && <span className="ml-1.5 font-mono text-[10px] font-normal text-ink-faint">{meta}</span>}
+          </span>
+        </button>
+      )}
+      {!readOnly && <RowActionMenu onMove={onMove} />}
     </div>
   )
 }

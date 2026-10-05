@@ -53,18 +53,24 @@ function hasPendingTasks(items: Item[], dayId: string): boolean {
  * data já passada. O Mês é só pra ver o que está ligado a cada dia.
  */
 function MonthItemLine({ item, onOpen }: { item: Item; onOpen: () => void }) {
+  // Evento só-leitura do Google (5.3): mostra marcado "Google", mas não abre o modal de edição.
+  const readOnly = Boolean(item.fromGoogle)
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={onOpen}
+      onClick={readOnly ? undefined : onOpen}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') onOpen()
+        if (!readOnly && e.key === 'Enter') onOpen()
       }}
-      className="flex max-w-[11rem] shrink-0 cursor-pointer items-center gap-1 rounded px-0.5 text-left leading-tight hover:bg-paper-dim/60"
+      className={cn(
+        'flex max-w-[11rem] shrink-0 items-center gap-1 rounded px-0.5 text-left leading-tight',
+        readOnly ? 'text-ink-dim' : 'cursor-pointer hover:bg-paper-dim/60',
+      )}
     >
       <ItemGlyph type={item.type} done={false} migrated={Boolean(item.migratedFrom)} delivery={item.isDelivery} interactive={false} onChange={() => {}} size="sm" />
       <span className="truncate text-[10px]">{item.title}</span>
+      {readOnly && <span className="shrink-0 font-mono text-[9px] text-ink-faint">Google</span>}
       {item.timeNote && <span className="shrink-0 font-mono text-[9px] text-ink-faint">{item.timeNote}</span>}
     </div>
   )
