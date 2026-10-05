@@ -344,7 +344,101 @@ function ProjectTasksPanel({ planner, contextId, title }: { planner: UsePlannerR
   )
 }
 
-/** Estágio/extensão (7): texto livre + tabela simples opcional de horas por atividade. */
+/** Tarefas do contexto Estágio (7.4) — alimentam o Backlog como as de Conexão/Acampamento; lista compacta no topo da página. */
+function EstagioTasksSection({ planner }: { planner: UsePlannerReturn }) {
+  const [modal, setModal] = useState<ModalState>(null)
+  const [newTitle, setNewTitle] = useState('')
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
+  const { handleMoveItem, handleDeleteItem, handleToggleDone, handleAddSubtask } = useItemActions(planner)
+
+  const items = planner.items.filter((it) => it.context === 'estagio' && !it.dayId)
+  const itemIds = new Set(items.map((it) => it.id))
+  const topLevel = items.filter((it) => !it.parentId || !itemIds.has(it.parentId))
+  const pendingTop = topLevel.filter((it) => !it.done)
+  const doneTop = topLevel.filter((it) => it.done)
+
+  function childrenOf(id: string): Item[] {
+    return items.filter((it) => it.parentId === id).sort((a, b) => a.order - b.order)
+  }
+
+  function toggleCollapsed(id: string) {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function renderRow(item: Item) {
+    const children = childrenOf(item.id)
+    const progress = children.length > 0 ? { done: children.filter((c) => c.done).length, total: children.length } : undefined
+    const parent = item.parentId ? planner.items.find((it) => it.id === item.parentId) : undefined
+    const collapsed = collapsedIds.has(item.id)
+    return (
+      <div key={item.id}>
+        <ItemRow
+          item={item}
+          progress={progress}
+          collapsed={collapsed}
+          onToggleCollapsed={progress ? () => toggleCollapsed(item.id) : undefined}
+          parentTitle={parent?.title}
+          onToggleDone={() => handleToggleDone(item.id)}
+          onOpen={() => setModal({ type: 'item', item })}
+          onMove={(action) => handleMoveItem(item, action)}
+        />
+        {progress && !collapsed && <div className="flex flex-col">{children.map((c) => renderRow(c))}</div>}
+      </div>
+    )
+  }
+
+  function handleAdd(e: FormEvent) {
+    e.preventDefault()
+    if (!newTitle.trim()) return
+    planner.addItem({ type: 'task', title: newTitle.trim(), context: 'estagio' })
+    setNewTitle('')
+  }
+
+  return (
+    <section className={sectionClass}>
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-dim">Tarefas</h2>
+      <div className="flex flex-col gap-0.5">
+        {pendingTop.length === 0 && <p className="p-2 font-mono text-[10px] text-ink-faint">nenhuma tarefa ainda</p>}
+        {pendingTop.map((item) => renderRow(item))}
+        {doneTop.length > 0 && <div className="mt-2 flex flex-col border-t border-line pt-2">{doneTop.map((item) => renderRow(item))}</div>}
+      </div>
+      <form onSubmit={handleAdd} className="flex gap-1.5 border-t border-line pt-3">
+        <input
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.target.value)}
+          placeholder="Nova tarefa de Estágio…"
+          className={cn(inputClass, 'flex-1 text-sm')}
+        />
+        <button type="submit" className="flex shrink-0 items-center justify-center rounded-sm border border-line px-2 text-ink-dim hover:border-line-strong" aria-label="Adicionar tarefa">
+          <Plus className="size-3.5" />
+        </button>
+      </form>
+
+      <EditItemModal
+        state={modal}
+        items={planner.items}
+        contexts={planner.contexts}
+        onClose={() => setModal(null)}
+        onAddContext={planner.addContext}
+        onSave={(id, data) => {
+          if (id) planner.updateItem(id, data)
+          else planner.addItem({ ...data, order: Date.now() })
+        }}
+        onDelete={handleDeleteItem}
+        onMove={handleMoveItem}
+        onToggleItemDone={handleToggleDone}
+        onAddSubtask={handleAddSubtask}
+      />
+    </section>
+  )
+}
+
+/** Estágio/extensão (7): tarefas (alimentam o Backlog) + texto livre + tabela simples opcional de horas por atividade. */
 function EstagioPage({ planner }: { planner: UsePlannerReturn }) {
   const [activity, setActivity] = useState('')
   const [hours, setHours] = useState('')
@@ -361,6 +455,7 @@ function EstagioPage({ planner }: { planner: UsePlannerReturn }) {
   return (
     <div className="flex flex-col gap-3">
       <h1 className="font-serif text-lg font-semibold">Estágio</h1>
+      <EstagioTasksSection planner={planner} />
       <BlurSavedTextarea
         value={planner.estagioNotes}
         onSave={planner.setEstagioNotes}
