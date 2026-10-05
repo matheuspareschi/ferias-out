@@ -1,4 +1,4 @@
-import { NotebookPen, Plus } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, NotebookPen, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { BlurSavedTextarea } from '@/components/BlurSavedField'
 import { WEEKDAY_LONG, dayLabel, formatDayShort, isPastDay } from '@/lib/days'
@@ -15,10 +15,9 @@ import { UnscheduledList } from './UnscheduledList'
 interface DayColumnProps {
   dayId: string
   weekday: string
-  isAnchor: boolean
   /** Já filtrados pra este dia (dayId === este dia). */
   items: Item[]
-  /** Lista completa (todos os dias) — pra achar pai/subtarefas que não moram neste dia. */
+  /** Lista completa (todos os dias) — pra achar pai/subtarefas que não moram neste dia, e os pendentes. */
   allItems: Item[]
   meta: DayMeta
   onSetCategory: (dayId: string, category: DayCategoryId | null) => void
@@ -27,12 +26,15 @@ interface DayColumnProps {
   onOpenItem: (item: Item) => void
   onAddItem: (dayId: string) => void
   onMoveItem: (item: Item, action: MoveAction) => void
+  onGoPrev: () => void
+  onGoToday: () => void
+  /** false quando já está vendo hoje — some o botão "Hoje". */
+  showTodayButton: boolean
 }
 
 export function DayColumn({
   dayId,
   weekday,
-  isAnchor,
   items,
   allItems,
   meta,
@@ -42,14 +44,23 @@ export function DayColumn({
   onOpenItem,
   onAddItem,
   onMoveItem,
+  onGoPrev,
+  onGoToday,
+  showTodayButton,
 }: DayColumnProps) {
   // Dias passados continuam editáveis — só ganham uma marcação informativa no cabeçalho.
   const isPast = isPastDay(dayId)
   const [noteOpen, setNoteOpen] = useState(false)
+  const [pendingOpen, setPendingOpen] = useState(false)
   const habitItems = items.filter((it) => it.habit)
   const otherItems = items.filter((it) => !it.habit)
   const unassigned = otherItems.filter((it) => !it.period)
   const label = dayLabel(dayId)
+
+  // Pendentes de dias ANTERIORES ao que está sendo visto (2.3) — não é mais só "ontem".
+  const pendingItems = allItems
+    .filter((it) => it.type === 'task' && !it.habit && !it.done && it.dayId && it.dayId < dayId)
+    .sort((a, b) => (a.dayId! < b.dayId! ? -1 : 1))
 
   // Um hábito com período aparece duas vezes de propósito: sempre na HabitStrip,
   // e também como linha aqui dentro — por isso usa `items` (não `otherItems`).
@@ -78,27 +89,42 @@ export function DayColumn({
   }
 
   return (
-    <div
-      className={cn(
-        'flex min-w-0 flex-1 flex-col rounded-md border',
-        isAnchor ? 'border-accent/50 bg-paper-raised/50 shadow-card' : 'border-line bg-paper-raised/15',
-      )}
-    >
+    <div className="flex min-w-0 flex-1 flex-col">
       <div className="flex items-start justify-between gap-2 border-b border-line px-2.5 py-2">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <p className="truncate font-serif text-sm font-semibold capitalize leading-tight">
-              {WEEKDAY_LONG[weekday] ?? weekday}
+        <div className="flex min-w-0 items-start gap-1">
+          <button
+            type="button"
+            onClick={onGoPrev}
+            className="mt-0.5 shrink-0 rounded-sm p-1 text-ink-dim transition-colors hover:bg-paper-dim hover:text-ink"
+            aria-label="Dia anterior"
+            title="Dia anterior"
+          >
+            <ChevronLeft className="size-3.5" />
+          </button>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <p className="truncate font-serif text-sm font-semibold capitalize leading-tight">
+                {WEEKDAY_LONG[weekday] ?? weekday}
+              </p>
+              <DayCategoryTag value={meta.category ?? null} onChange={(v) => onSetCategory(dayId, v)} />
+            </div>
+            <p className="font-mono text-xs text-ink-dim">
+              {formatDayShort(dayId)}
+              {label ? ` · ${label}` : ''}
+              {isPast ? ' · passado' : ''}
             </p>
-            <DayCategoryTag value={meta.category ?? null} onChange={(v) => onSetCategory(dayId, v)} />
           </div>
-          <p className="font-mono text-xs text-ink-dim">
-            {formatDayShort(dayId)}
-            {label ? ` · ${label}` : ''}
-            {isPast ? ' · passado' : ''}
-          </p>
         </div>
         <div className="flex shrink-0 items-center gap-0.5">
+          {showTodayButton && (
+            <button
+              type="button"
+              onClick={onGoToday}
+              className="flex items-center gap-1 rounded-sm border border-line px-2 py-1 text-xs text-ink-dim transition-colors hover:border-line-strong hover:text-ink"
+            >
+              Hoje <ChevronRight className="size-3" />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setNoteOpen((v) => !v)}
@@ -123,6 +149,35 @@ export function DayColumn({
           </button>
         </div>
       </div>
+
+      {pendingItems.length > 0 && (
+        <div className="border-b border-line px-2.5 py-1.5">
+          <button
+            type="button"
+            onClick={() => setPendingOpen((v) => !v)}
+            className="flex items-center gap-1 font-mono text-[10px] text-attention hover:underline"
+          >
+            <ChevronDown className={cn('size-3 transition-transform', !pendingOpen && '-rotate-90')} />
+            {pendingItems.length} pendente{pendingItems.length > 1 ? 's' : ''} de dias anteriores
+          </button>
+          {pendingOpen && (
+            <div className="mt-1 flex flex-col">
+              {pendingItems.map((item) => (
+                <ItemRow
+                  key={item.id}
+                  item={item}
+                  overdue
+                  parentTitle={formatDayShort(item.dayId!)}
+                  sizeSuffix={item.context === 'faculdade' ? item.size : undefined}
+                  onToggleDone={() => onToggleDone(item.id)}
+                  onOpen={() => onOpenItem(item)}
+                  onMove={(action) => onMoveItem(item, action)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {noteOpen && (
         <div className="border-b border-line px-2.5 py-2">

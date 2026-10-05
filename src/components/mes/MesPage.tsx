@@ -5,6 +5,7 @@ import { EditItemModal, type ModalState } from '@/components/planner/EditItemMod
 import { useItemActions } from '@/hooks/useItemActions'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
 import { addMonths, daysInMonthCount, todayId, weekdayOf } from '@/lib/dates'
+import { isPastDay } from '@/lib/days'
 import { HABIT_ICON, HABIT_ORDER } from '@/lib/habits'
 import type { Item } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -14,6 +15,8 @@ interface MesPageProps {
   month: string
   onMonthChange: (month: string) => void
   onOpenRetrospectiva: (month: string) => void
+  /** "Clicar em um dia passado abre-o na visão Hoje" (5.1). */
+  onOpenDay: (dayId: string) => void
 }
 
 function monthLabel(monthId: string): string {
@@ -51,7 +54,7 @@ function MonthItemLine({ item, onToggleDone, onOpen }: { item: Item; onToggleDon
   )
 }
 
-export function MesPage({ planner, month, onMonthChange, onOpenRetrospectiva }: MesPageProps) {
+export function MesPage({ planner, month, onMonthChange, onOpenRetrospectiva, onOpenDay }: MesPageProps) {
   const [modal, setModal] = useState<ModalState>(null)
   const { handleMoveItem, handleToggleDone, handleAddSubtask } = useItemActions(planner)
   const today = todayId()
@@ -81,10 +84,15 @@ export function MesPage({ planner, month, onMonthChange, onOpenRetrospectiva }: 
           )
           return (
             <div key={dayId} className={cn('flex gap-2 border-b border-line px-2 py-1.5 last:border-0', isToday && 'bg-accent-soft/40')}>
-              <div className="w-12 shrink-0">
+              <button
+                type="button"
+                onClick={() => isPastDay(dayId) && onOpenDay(dayId)}
+                disabled={!isPastDay(dayId)}
+                className={cn('w-12 shrink-0 text-left', isPastDay(dayId) && 'cursor-pointer hover:underline')}
+              >
                 <p className={cn('font-mono text-xs', isToday ? 'font-semibold text-accent' : 'text-ink-dim')}>{dayNum}</p>
                 <p className="font-mono text-[9px] uppercase text-ink-faint">{weekdayOf(dayId)}</p>
-              </div>
+              </button>
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 {dayItems.length === 0 ? (
                   <span className="text-[10px] text-ink-faint">—</span>

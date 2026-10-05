@@ -1,4 +1,4 @@
-import { addDays, compareDayIds, todayId, weekdayOf } from './dates'
+import { compareDayIds, todayId, weekdayOf } from './dates'
 import type { Day } from './types'
 
 export { todayId } from './dates'
@@ -59,15 +59,3 @@ export function defaultAnchorDayId(): string {
   return todayId()
 }
 
-/**
- * Janela de dias ao redor de um centro, inclusive — usada tanto pelo
- * PlannerBoard (3 dias) quanto pela DayTrail (uma faixa maior). Sempre
- * retorna `before + 1 + after` dias; não há mais limite de início/fim.
- */
-export function daysAround(centerId: string, before: number, after: number): Day[] {
-  const days: Day[] = []
-  for (let i = -before; i <= after; i++) {
-    days.push(dayOf(addDays(centerId, i)))
-  }
-  return days
-}

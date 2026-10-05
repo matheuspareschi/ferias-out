@@ -273,7 +273,7 @@ export function usePlanner() {
    * pai (concluído automaticamente quando todas as irmãs terminam, e pode
    * "desconcluir" se alguma voltar a ficar pendente). Completar manualmente
    * um pai com subtarefas pendentes exige `cascadeToChildren: true` — quem
-   * decide pedir confirmação antes é a UI (ver PlannerBoard).
+   * decide pedir confirmação antes é a UI (ver useItemActions).
    */
   const toggleDone = useCallback((id: string, opts?: { cascadeToChildren?: boolean }) => {
     setState((s) => {

@@ -5,10 +5,10 @@ import type { Item } from '@/lib/types'
 
 /**
  * Ações de mover/concluir/subtarefa (2.6/2.7) reutilizáveis por qualquer
- * página que precise abrir o EditItemModal fora da Semana (Mês, Ano,
- * Backlog) — a Semana continua com a sua própria cópia em PlannerBoard,
- * que precisa de ordenação exata dentro do container de drag-and-drop;
- * aqui "mover" sempre manda o item pro fim da lista do dia de destino.
+ * página que abra o EditItemModal — aqui "mover" sempre manda o item pro
+ * fim da lista do dia de destino (ordenação exata só importa durante um
+ * arraste de verdade, que cada página com drag-and-drop resolve com a sua
+ * própria lógica de `entriesFor`/`computeOrder`).
  */
 export function useItemActions(planner: UsePlannerReturn) {
   function handleMoveItem(item: Item, action: MoveAction) {

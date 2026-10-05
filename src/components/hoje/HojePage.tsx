@@ -1,17 +1,18 @@
 import { DndContext, DragOverlay, MouseSensor, TouchSensor, pointerWithin, useSensor, useSensors } from '@dnd-kit/core'
 import type { DragEndEvent, DragPendingEvent, DragStartEvent } from '@dnd-kit/core'
 import { useState } from 'react'
+import { DayColumn } from '@/components/planner/DayColumn'
+import { EditItemModal, type ModalState } from '@/components/planner/EditItemModal'
+import { useItemActions } from '@/hooks/useItemActions'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
 import { addDays, todayId } from '@/lib/dates'
-import { daysAround } from '@/lib/days'
+import { dayOf } from '@/lib/days'
 import { type ContainerRef, itemDndId, parseContainerId, PendingDndContext, splitDndId } from '@/lib/dnd'
-import type { Item, PeriodId } from '@/lib/types'
-import { BacklogSidebar } from './BacklogSidebar'
-import { DayColumn } from './DayColumn'
-import { EditItemModal, type ModalState } from './EditItemModal'
-import type { MoveAction } from './ItemRow'
+import type { PeriodId } from '@/lib/types'
+import { cn } from '@/lib/utils'
+import { BacklogPanel } from './BacklogPanel'
 
-interface PlannerBoardProps {
+interface HojePageProps {
   planner: UsePlannerReturn
 }
 
@@ -19,18 +20,25 @@ interface DragPayload {
   dndId: string
 }
 
-export function PlannerBoard({ planner }: PlannerBoardProps) {
+type MobileTab = 'backlog' | 'hoje'
+
+/**
+ * Visão "Hoje" (2.3) — dois painéis 50/50 (Backlog | dia atual), sem faixa
+ * de dias e sem navegação pra frente: só hoje e, pra trás, os dias
+ * anteriores (um de cada vez). No celular vira abas.
+ */
+export function HojePage({ planner }: HojePageProps) {
   const [modal, setModal] = useState<ModalState>(null)
   const [activeDragTitle, setActiveDragTitle] = useState<string | null>(null)
   const [pendingDndId, setPendingDndId] = useState<string | null>(null)
+  const [mobileTab, setMobileTab] = useState<MobileTab>('hoje')
+  const { handleMoveItem, handleToggleDone, handleAddSubtask } = useItemActions(planner)
 
   const sensors = useSensors(
     // Mouse (desktop): arraste começa assim que o cursor se move um pouco, como antes.
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     // Toque (mobile): precisa segurar 3s parado pra ativar — evita que um toque
-    // qualquer (rolar a tela, tocar no checkbox) já mude o cartão de lugar. A
-    // tolerância é generosa porque segurar o dedo perfeitamente parado por 3s
-    // reais não é realista — um pouco de tremor não pode cancelar o arraste.
+    // qualquer (rolar a tela, tocar no checkbox) já mude o cartão de lugar.
     useSensor(TouchSensor, { activationConstraint: { delay: 3000, tolerance: 20 } }),
   )
 
@@ -41,10 +49,14 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
     setPendingDndId(null)
   }
 
-  // Calendário sem fim: sempre 3 dias (ontem/hoje/amanhã em relação à âncora),
-  // sem limite de início ou fim pra nenhum dos lados. A navegação prev/seguinte
-  // mora no cabeçalho do app (nav de topo), não aqui.
-  const windowDays = daysAround(planner.anchorDayId, 1, 1)
+  const day = dayOf(planner.anchorDayId)
+
+  function goPrev() {
+    planner.setAnchorDay(addDays(planner.anchorDayId, -1))
+  }
+  function goToday() {
+    planner.setAnchorDay(todayId())
+  }
 
   function handleDragStart(event: DragStartEvent) {
     setPendingDndId(null)
@@ -121,47 +133,8 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
     planner.updateItem(id, { dayId: target.dayId, period, order })
   }
 
-  /** Ações de mover (linha ou modal): amanhã / outro dia / voltar ao backlog / excluir. */
-  function handleMoveItem(item: Item, action: MoveAction) {
-    if (action.kind === 'delete') {
-      planner.deleteItem(item.id)
-      return
-    }
-    if (action.kind === 'backlog') {
-      planner.updateItem(item.id, { dayId: undefined, period: null, migratedFrom: item.dayId })
-      return
-    }
-    const dayId = action.kind === 'tomorrow' ? addDays(item.dayId ?? todayId(), 1) : action.dayId
-    const container: ContainerRef = item.period ? { type: 'period', dayId, period: item.period } : { type: 'unassigned', dayId }
-    const order = appendOrder(container, itemDndId(item.id))
-    planner.updateItem(item.id, { dayId, period: item.period, order, migratedFrom: item.dayId })
-  }
-
-  /** Concluir manualmente um pai com subtarefas pendentes pede confirmação antes de cascatear. */
-  function handleToggleDone(id: string) {
-    const item = planner.items.find((it) => it.id === id)
-    if (!item) return
-    const children = planner.items.filter((it) => it.parentId === id)
-    const hasPending = children.some((c) => !c.done)
-    if (!item.done && children.length > 0 && hasPending) {
-      if (!window.confirm('Esta tarefa tem subtarefas pendentes. Concluir todas mesmo assim?')) return
-      planner.toggleDone(id, { cascadeToChildren: true })
-      return
-    }
-    planner.toggleDone(id)
-  }
-
-  function handleAddSubtask(parentId: string, title: string) {
-    const parent = planner.items.find((it) => it.id === parentId)
-    if (!parent) return
-    planner.addItem({
-      type: 'task',
-      title,
-      context: parent.context,
-      dayId: parent.dayId,
-      period: parent.period,
-      parentId,
-    })
+  function handleRefineToWeek(id: string, weekId: string) {
+    planner.updateItem(id, { referenceWeek: weekId, referenceMonth: undefined })
   }
 
   return (
@@ -178,41 +151,53 @@ export function PlannerBoard({ planner }: PlannerBoardProps) {
       }}
     >
       <PendingDndContext.Provider value={pendingDndId}>
-        <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:overflow-hidden">
-          <div className="flex flex-1 flex-col gap-2 lg:overflow-hidden">
-            <div className="grid flex-1 auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:overflow-hidden">
-              {windowDays.map((day) => {
-                const isAnchor = day.id === planner.anchorDayId
-                return (
-                  <div key={day.id} className={isAnchor ? 'contents' : 'hidden sm:contents'}>
-                    <DayColumn
-                      dayId={day.id}
-                      weekday={day.weekday}
-                      isAnchor={isAnchor}
-                      items={planner.items.filter((i) => i.dayId === day.id)}
-                      allItems={planner.items}
-                      meta={planner.dayMeta[day.id] ?? {}}
-                      onSetCategory={planner.setDayCategory}
-                      onSetNote={planner.setDayNote}
-                      onToggleDone={handleToggleDone}
-                      onOpenItem={(item) => setModal({ type: 'item', item })}
-                      onAddItem={(dayId) => setModal({ type: 'new', dayId })}
-                      onMoveItem={handleMoveItem}
-                    />
-                  </div>
-                )
-              })}
-            </div>
+        <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-line lg:flex-row">
+          <div className="flex shrink-0 border-b border-line lg:hidden">
+            {(['backlog', 'hoje'] as MobileTab[]).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setMobileTab(tab)}
+                className={cn(
+                  'flex-1 py-2 text-center text-xs font-semibold uppercase tracking-wide',
+                  mobileTab === tab ? 'bg-ink text-paper' : 'text-ink-dim',
+                )}
+              >
+                {tab === 'backlog' ? 'Backlog' : 'Hoje'}
+              </button>
+            ))}
           </div>
 
-          <BacklogSidebar
-            items={planner.items}
-            contexts={planner.contexts}
-            onToggleDone={handleToggleDone}
-            onOpen={(item) => setModal({ type: 'item', item })}
-            onAdd={(data) => planner.addItem({ type: 'task', ...data })}
-            onMoveItem={handleMoveItem}
-          />
+          <div className={cn('min-h-0 flex-1 border-line lg:block lg:w-1/2 lg:border-r', mobileTab === 'backlog' ? 'block' : 'hidden')}>
+            <BacklogPanel
+              items={planner.items}
+              contexts={planner.contexts}
+              onToggleDone={handleToggleDone}
+              onOpen={(item) => setModal({ type: 'item', item })}
+              onAdd={(data) => planner.addItem({ type: 'task', ...data })}
+              onMoveItem={handleMoveItem}
+              onRefineToWeek={handleRefineToWeek}
+            />
+          </div>
+
+          <div className={cn('min-h-0 flex-1 overflow-y-auto lg:block lg:w-1/2', mobileTab === 'hoje' ? 'block' : 'hidden')}>
+            <DayColumn
+              dayId={day.id}
+              weekday={day.weekday}
+              items={planner.items.filter((i) => i.dayId === day.id)}
+              allItems={planner.items}
+              meta={planner.dayMeta[day.id] ?? {}}
+              onSetCategory={planner.setDayCategory}
+              onSetNote={planner.setDayNote}
+              onToggleDone={handleToggleDone}
+              onOpenItem={(item) => setModal({ type: 'item', item })}
+              onAddItem={(dayId) => setModal({ type: 'new', dayId })}
+              onMoveItem={handleMoveItem}
+              onGoPrev={goPrev}
+              onGoToday={goToday}
+              showTodayButton={day.id !== todayId()}
+            />
+          </div>
         </div>
       </PendingDndContext.Provider>
 

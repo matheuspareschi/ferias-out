@@ -1,19 +1,18 @@
-import { ChevronLeft, ChevronRight, Cloud, CloudOff, Download, Moon, Plug, RefreshCw, Sun, Upload } from 'lucide-react'
+import { Cloud, CloudOff, Download, Moon, Plug, RefreshCw, Sun, Upload } from 'lucide-react'
 import { useRef, useState, type ChangeEvent } from 'react'
 import { AnoPage } from '@/components/ano/AnoPage'
 import { BacklogPage } from '@/components/backlog/BacklogPage'
-import { DayTrail } from '@/components/DayTrail'
 import { HabitosPage } from '@/components/habitos/HabitosPage'
+import { HojePage } from '@/components/hoje/HojePage'
 import { MesPage } from '@/components/mes/MesPage'
 import { NavTabs, type SectionId } from '@/components/NavTabs'
-import { PlannerBoard } from '@/components/planner/PlannerBoard'
 import { ProjetosPage } from '@/components/projetos/ProjetosPage'
 import { RetrospectivaPage } from '@/components/retrospectiva/RetrospectivaPage'
 import { useGoogleCalendar, type UseGoogleCalendarReturn } from '@/hooks/useGoogleCalendar'
 import { useGoogleSyncedPlanner } from '@/hooks/useGoogleSyncedPlanner'
 import { usePlanner } from '@/hooks/usePlanner'
 import { useTheme } from '@/hooks/useTheme'
-import { addDays, monthIdOf, todayId } from '@/lib/dates'
+import { monthIdOf, todayId } from '@/lib/dates'
 import { cn } from '@/lib/utils'
 
 function SyncIndicator({ status }: { status: ReturnType<typeof usePlanner>['syncStatus'] }) {
@@ -91,6 +90,12 @@ export default function App() {
     setSection('retrospectiva')
   }
 
+  /** Mês: "clicar em um dia passado abre-o na visão Hoje" (5.1). */
+  function goToDay(dayId: string) {
+    syncedPlanner.setAnchorDay(dayId)
+    setSection('semana')
+  }
+
   function handleExport() {
     const json = JSON.stringify(syncedPlanner.exportState(), null, 2)
     const blob = new Blob([json], { type: 'application/json' })
@@ -151,43 +156,17 @@ export default function App() {
             </button>
           </div>
         </div>
-
-        {section === 'semana' && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => syncedPlanner.setAnchorDay(addDays(syncedPlanner.anchorDayId, -1))}
-              className="shrink-0 rounded-sm p-1 text-ink-dim transition-colors hover:bg-paper-dim hover:text-ink"
-              aria-label="Dia anterior"
-              title="Dia anterior"
-            >
-              <ChevronLeft className="size-3.5" />
-            </button>
-            <div className="min-w-0 flex-1">
-              <DayTrail anchorDayId={syncedPlanner.anchorDayId} onSelect={syncedPlanner.setAnchorDay} />
-            </div>
-            <button
-              type="button"
-              onClick={() => syncedPlanner.setAnchorDay(addDays(syncedPlanner.anchorDayId, 1))}
-              className="shrink-0 rounded-sm p-1 text-ink-dim transition-colors hover:bg-paper-dim hover:text-ink"
-              aria-label="Dia seguinte"
-              title="Dia seguinte"
-            >
-              <ChevronRight className="size-3.5" />
-            </button>
-          </div>
-        )}
       </header>
 
       <main className="flex flex-1 flex-col overflow-y-auto p-3 sm:p-4 lg:overflow-hidden">
         {section === 'semana' ? (
-          <PlannerBoard planner={syncedPlanner} />
+          <HojePage planner={syncedPlanner} />
         ) : section === 'projetos' ? (
           <ProjetosPage planner={syncedPlanner} />
         ) : section === 'habitos' ? (
           <HabitosPage planner={syncedPlanner} />
         ) : section === 'mes' ? (
-          <MesPage planner={syncedPlanner} month={mesMonth} onMonthChange={setMesMonth} onOpenRetrospectiva={goToRetrospectiva} />
+          <MesPage planner={syncedPlanner} month={mesMonth} onMonthChange={setMesMonth} onOpenRetrospectiva={goToRetrospectiva} onOpenDay={goToDay} />
         ) : section === 'ano' ? (
           <AnoPage planner={syncedPlanner} onOpenMonth={goToMonth} />
         ) : section === 'retrospectiva' ? (
