@@ -439,14 +439,56 @@ describe('normalizeState — v6 (projectNotes nota única) → v7 (anotações d
   })
 })
 
+describe('normalizeState — v7 (sem origem em Item) → v8', () => {
+  function v7State(overrides: Record<string, unknown> = {}) {
+    return {
+      schemaVersion: 7,
+      contexts: [{ id: 'pessoal', label: 'Pessoal' }],
+      dayMeta: {},
+      anchorDayId: '2026-09-25',
+      items: [{ id: 'i1', type: 'event', title: 'Consulta', context: 'pessoal', order: 0, done: false, dayId: '2026-10-18' }],
+      disciplines: [],
+      units: [],
+      facultyNotes: { general: '', byDiscipline: {} },
+      gaebIdeias: [],
+      gaebEncontros: [],
+      projectNotes: {},
+      estagioNotes: '',
+      estagioHours: [],
+      retrospectives: {},
+      dismissedDayLabels: [],
+      ...overrides,
+    }
+  }
+
+  it('is a pure passthrough — existing items never retroactively gain origem', () => {
+    const result = normalizeState(v7State())
+    expect(result?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
+    expect(result?.items[0].origem).toBeUndefined()
+  })
+
+  it('carries origem through when already present', () => {
+    const result = normalizeState(
+      v7State({
+        items: [
+          { id: 'i1', type: 'event', title: 'Viagem', context: 'pessoal', order: 0, done: false, dayId: '2026-12-06', origem: 'ano' },
+        ],
+      }),
+    )
+    expect(result?.items[0].origem).toBe('ano')
+  })
+})
+
 describe('needsMigration', () => {
-  it('is true for legacy v0 shapes, v1, v2, v3, v4, v5 and v6', () => {
+  it('is true for legacy v0 shapes, v1, v2, v3, v4, v5, v6 and v7', () => {
     expect(needsMigration({ agendaItems: [], backlogItems: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 1, items: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 2, items: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 3, items: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 4, items: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 5, items: [], anchorDayId: '2026-09-25' })).toBe(true)
+    expect(needsMigration({ schemaVersion: 6, items: [], anchorDayId: '2026-09-25' })).toBe(true)
+    expect(needsMigration({ schemaVersion: 7, items: [], anchorDayId: '2026-09-25' })).toBe(true)
     expect(needsMigration({ schemaVersion: 6, items: [], anchorDayId: '2026-09-25' })).toBe(true)
   })
 

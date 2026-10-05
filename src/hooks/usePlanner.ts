@@ -243,6 +243,7 @@ export function usePlanner() {
             | 'referenceMonth'
             | 'referenceWeek'
             | 'parentId'
+            | 'origem'
           >
         >,
     ) => {
@@ -260,6 +261,7 @@ export function usePlanner() {
         referenceMonth: data.referenceMonth,
         referenceWeek: data.referenceWeek,
         parentId: data.parentId,
+        origem: data.origem,
         done: false,
       })
       setState((s) => ({ ...s, items: [...s.items, item] }))

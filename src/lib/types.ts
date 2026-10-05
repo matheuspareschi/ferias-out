@@ -84,6 +84,8 @@ export interface Item {
   googleUpdated?: string
   /** true pra um evento só-leitura vindo do Google (nunca editado por aqui). */
   fromGoogle?: boolean
+  /** Marca um item lançado direto na visão Ano (2.4/5.2) — só esses aparecem nas caixas do Ano. */
+  origem?: 'ano'
 }
 
 /** Disciplina da Faculdade — sigla curta + nome completo. */
