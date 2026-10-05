@@ -19,13 +19,8 @@ const sectionClass = 'flex flex-col gap-3 rounded-sm border border-line bg-paper
 
 export function FaculdadePage({ planner }: FaculdadePageProps) {
   return (
-    <div className="flex flex-col gap-4 overflow-y-auto pb-4">
-      <div>
-        <h1 className="font-serif text-lg font-semibold">Faculdade</h1>
-        <p className="font-mono text-[10px] text-ink-faint">
-          outros projetos (GAEB, Conexão, Acampamento, Estágio) chegam na Fase 6
-        </p>
-      </div>
+    <div className="flex flex-col gap-4">
+      <h1 className="font-serif text-lg font-semibold">Faculdade</h1>
       <UnitsGrid planner={planner} />
       <LiveClassesSection planner={planner} />
       <DeliveriesSection planner={planner} />

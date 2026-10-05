@@ -3,11 +3,11 @@ import { useRef, useState, type ChangeEvent } from 'react'
 import { AnoPage } from '@/components/ano/AnoPage'
 import { BacklogPage } from '@/components/backlog/BacklogPage'
 import { DayTrail } from '@/components/DayTrail'
-import { FaculdadePage } from '@/components/faculdade/FaculdadePage'
 import { HabitosPage } from '@/components/habitos/HabitosPage'
 import { MesPage } from '@/components/mes/MesPage'
 import { NavTabs, type SectionId } from '@/components/NavTabs'
 import { PlannerBoard } from '@/components/planner/PlannerBoard'
+import { ProjetosPage } from '@/components/projetos/ProjetosPage'
 import { RetrospectivaPage } from '@/components/retrospectiva/RetrospectivaPage'
 import { usePlanner } from '@/hooks/usePlanner'
 import { useTheme } from '@/hooks/useTheme'
@@ -159,7 +159,7 @@ export default function App() {
         {section === 'semana' ? (
           <PlannerBoard planner={planner} />
         ) : section === 'projetos' ? (
-          <FaculdadePage planner={planner} />
+          <ProjetosPage planner={planner} />
         ) : section === 'habitos' ? (
           <HabitosPage planner={planner} />
         ) : section === 'mes' ? (
