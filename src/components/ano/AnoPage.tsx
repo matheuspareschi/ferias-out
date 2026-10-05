@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
 import { DEFAULT_CONTEXT_ID } from '@/lib/contexts'
+import { firstDayOfMonth, lastDayOfMonth } from '@/lib/dates'
 import { monthWeeks } from '@/lib/habitGrid'
 import type { Item, ItemType } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -17,10 +18,19 @@ function monthShortLabel(monthId: string): string {
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
+/** Compromissos do mês (5.2): só eventos e ★ entregas — mesma regra do Mês (5.1), sem tarefa simples nem hábito. */
+function commitmentsForMonth(items: Item[], monthId: string): Item[] {
+  const monthStart = firstDayOfMonth(monthId)
+  const monthEnd = lastDayOfMonth(monthId)
+  return items
+    .filter((it) => (it.type === 'event' || it.isDelivery) && it.dayId && it.dayId <= monthEnd && (it.endDayId ?? it.dayId) >= monthStart)
+    .sort((a, b) => (a.dayId! < b.dayId! ? -1 : a.dayId! > b.dayId! ? 1 : a.title.localeCompare(b.title)))
+}
+
 type Marker = 'star' | 'bar' | 'dot' | null
 
-function markerForDay(items: Item[], dayId: string): Marker {
-  const dayItems = items.filter((it) => it.dayId && (it.dayId === dayId || (it.endDayId && it.dayId < dayId && dayId <= it.endDayId)))
+function markerForDay(monthCommitments: Item[], dayId: string): Marker {
+  const dayItems = monthCommitments.filter((it) => it.dayId === dayId || (it.endDayId && it.dayId! < dayId && dayId <= it.endDayId))
   if (dayItems.length === 0) return null
   if (dayItems.some((it) => it.isDelivery)) return 'star'
   if (dayItems.some((it) => it.endDayId && it.endDayId !== it.dayId)) return 'bar'
@@ -32,6 +42,18 @@ function MarkerShape({ marker }: { marker: Marker }) {
   if (marker === 'star') return <span className="text-[8px] leading-none text-attention">★</span>
   if (marker === 'bar') return <span className="block h-0.5 w-2.5 rounded-full bg-ink-dim" aria-hidden />
   return <span className="block size-1 rounded-full bg-ink-dim" aria-hidden />
+}
+
+/** "18 · Médico" ou "10–14 · Viagem" — dia(s) recortados dentro do mês da caixa. */
+function commitmentLine(item: Item, monthId: string): string {
+  const monthStart = firstDayOfMonth(monthId)
+  const monthEnd = lastDayOfMonth(monthId)
+  const start = item.dayId! < monthStart ? monthStart : item.dayId!
+  const end = item.endDayId && item.endDayId > monthEnd ? monthEnd : (item.endDayId ?? start)
+  const startNum = Number(start.slice(-2))
+  const endNum = Number(end.slice(-2))
+  const dayLabel = endNum !== startNum ? `${startNum}–${endNum}` : `${startNum}`
+  return `${dayLabel} · ${item.title}`
 }
 
 export function AnoPage({ planner, onOpenMonth }: AnoPageProps) {
@@ -52,34 +74,52 @@ export function AnoPage({ planner, onOpenMonth }: AnoPageProps) {
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {months.map((monthId) => (
-          <div key={monthId} className="flex flex-col gap-1 rounded-sm border border-line bg-paper-raised/40 p-2">
-            <button type="button" onClick={() => onOpenMonth(monthId)} className="self-start text-xs font-semibold text-ink hover:text-accent">
-              {monthShortLabel(monthId)}
-            </button>
-            <div className="flex flex-col gap-0.5">
-              {monthWeeks(monthId).map((week, wi) => (
-                <div key={wi} className="flex gap-0.5">
-                  {week.map((d, di) => (
+        {months.map((monthId) => {
+          const commitments = commitmentsForMonth(planner.items, monthId)
+          return (
+            <div key={monthId} className="flex flex-col gap-1 rounded-sm border border-line bg-paper-raised/40 p-2">
+              <button type="button" onClick={() => onOpenMonth(monthId)} className="self-start text-xs font-semibold text-ink hover:text-accent">
+                {monthShortLabel(monthId)}
+              </button>
+              <div className="flex flex-col gap-0.5">
+                {monthWeeks(monthId).map((week, wi) => (
+                  <div key={wi} className="flex gap-0.5">
+                    {week.map((d, di) => (
+                      <button
+                        key={di}
+                        type="button"
+                        disabled={d === null}
+                        onClick={() => d && setQuickAdd(d)}
+                        className={cn(
+                          'flex size-6 flex-col items-center justify-center rounded-sm text-[9px]',
+                          d === null ? 'invisible' : 'text-ink-dim hover:bg-paper-dim hover:text-ink',
+                        )}
+                      >
+                        <span>{d ? Number(d.slice(-2)) : ''}</span>
+                        {d && <MarkerShape marker={markerForDay(commitments, d)} />}
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              {commitments.length > 0 && (
+                <div className="flex flex-col gap-0.5 border-t border-line pt-1">
+                  {commitments.map((item) => (
                     <button
-                      key={di}
+                      key={item.id}
                       type="button"
-                      disabled={d === null}
-                      onClick={() => d && setQuickAdd(d)}
-                      className={cn(
-                        'flex size-6 flex-col items-center justify-center rounded-sm text-[9px]',
-                        d === null ? 'invisible' : 'text-ink-dim hover:bg-paper-dim hover:text-ink',
-                      )}
+                      onClick={() => onOpenMonth(monthId)}
+                      className="truncate text-left font-mono text-[10px] text-ink-dim hover:text-accent"
+                      title={item.title}
                     >
-                      <span>{d ? Number(d.slice(-2)) : ''}</span>
-                      {d && <MarkerShape marker={markerForDay(planner.items, d)} />}
+                      {commitmentLine(item, monthId)}
                     </button>
                   ))}
                 </div>
-              ))}
+              )}
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {quickAdd && (
