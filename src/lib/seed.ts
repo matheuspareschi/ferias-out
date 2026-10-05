@@ -37,7 +37,11 @@ function agenda(
   }
 }
 
-/** Rotina-base completa: dias de semana comuns e Retiro. Sem período até o usuário arrastar. */
+/**
+ * Rotina-base: os 6 hábitos, todo santo dia, sem exceção — viagem, retiro,
+ * domingo ou sábado não desligam hábito nenhum (4.?). Sem período até o
+ * usuário arrastar.
+ */
 function rotinaCompleta(dayId: string): Item[] {
   return [
     agenda(dayId, 'Devocional', null, undefined, 'devocional'),
@@ -45,27 +49,8 @@ function rotinaCompleta(dayId: string): Item[] {
     agenda(dayId, 'Leitura', null, undefined, 'leitura'),
     agenda(dayId, 'Exercício', null, undefined, 'exercicio'),
     agenda(dayId, 'Revisão da faculdade', null, undefined, 'revisao'),
+    agenda(dayId, 'Sem internet/notícias/redes', null, undefined, 'sem_internet'),
   ]
-}
-
-/** Rotina de sábado comum: igual à completa, sem revisão da faculdade. */
-function rotinaSabado(dayId: string): Item[] {
-  return [
-    agenda(dayId, 'Devocional', null, undefined, 'devocional'),
-    agenda(dayId, 'Alongamento', null, undefined, 'alongamento'),
-    agenda(dayId, 'Leitura', null, undefined, 'leitura'),
-    agenda(dayId, 'Exercício', null, undefined, 'exercicio'),
-  ]
-}
-
-/** Rotina reduzida de dia de viagem: só devocional + alongamento (+ leitura, opcional). */
-function rotinaViagem(dayId: string, comLeitura = false): Item[] {
-  const base = [
-    agenda(dayId, 'Devocional', null, undefined, 'devocional'),
-    agenda(dayId, 'Alongamento', null, undefined, 'alongamento'),
-  ]
-  if (comLeitura) base.push(agenda(dayId, 'Leitura', null, undefined, 'leitura'))
-  return base
 }
 
 function agendaItems(): Item[] {
@@ -84,18 +69,19 @@ function agendaItems(): Item[] {
     agenda('2026-09-25', 'Conectados — culto, som + ensaio do louvor', 'noite'),
 
     // 26/09 (sáb) — sábado comum
-    ...rotinaSabado('2026-09-26'),
+    ...rotinaCompleta('2026-09-26'),
     agenda('2026-09-26', 'Exames de sangue', 'manha'),
     agenda('2026-09-26', 'Ultrassom', 'manha', '11:20'),
     agenda('2026-09-26', 'Ensaio com a banda (tarde)', 'tarde'),
     agenda('2026-09-26', 'EB — estudo bíblico em casa', 'noite'),
 
-    // 27/09 (dom) — sem rotina
+    // 27/09 (dom)
+    ...rotinaCompleta('2026-09-27'),
     agenda('2026-09-27', 'Culto', 'manha'),
     agenda('2026-09-27', 'JVJ', 'noite'),
 
     // 28/09 (seg) — Bauru Day, viagem
-    ...rotinaViagem('2026-09-28'),
+    ...rotinaCompleta('2026-09-28'),
     agenda('2026-09-28', 'Viagem com amigos', 'manha'),
 
     // 29/09 (ter) — dia de semana normal
@@ -115,10 +101,11 @@ function agendaItems(): Item[] {
     agenda('2026-10-02', 'Área 51 — tarde/noite de jogos', 'tarde'),
 
     // 03/10 (sáb) — dia-buffer, sábado comum
-    ...rotinaSabado('2026-10-03'),
+    ...rotinaCompleta('2026-10-03'),
     agenda('2026-10-03', 'EB — estudo bíblico', 'noite'),
 
-    // 04/10 (dom) — sem rotina
+    // 04/10 (dom)
+    ...rotinaCompleta('2026-10-04'),
     agenda('2026-10-04', 'Culto', 'manha'),
     agenda('2026-10-04', 'Eleição', 'manha'),
     agenda('2026-10-04', 'JVJ', 'noite'),
@@ -139,12 +126,13 @@ function agendaItems(): Item[] {
     ...rotinaCompleta('2026-10-08'),
     agenda('2026-10-08', 'GAEB', 'noite'),
 
-    // 09/10 (sex) — viagem a Paraty, com leitura
-    ...rotinaViagem('2026-10-09', true),
+    // 09/10 (sex) — viagem a Paraty
+    ...rotinaCompleta('2026-10-09'),
     agenda('2026-10-09', 'Saída de Tatuí', 'tarde', '16:30'),
     agenda('2026-10-09', 'Chegada em Paraty (check-in)', 'noite', '23:00'),
 
-    // 10/10 (sáb) — Paraty, sem rotina-base
+    // 10/10 (sáb) — Paraty
+    ...rotinaCompleta('2026-10-10'),
     agenda('2026-10-10', 'Saída da pousada', 'manha', '08:30'),
     agenda('2026-10-10', 'Poço da Jamaica', 'manha', '09:00–11:00'),
     agenda('2026-10-10', 'Almoço', 'tarde', '11:30'),
@@ -152,14 +140,16 @@ function agendaItems(): Item[] {
     agenda('2026-10-10', 'Praia do Cachadaço', 'tarde', '14:00–18:00'),
     agenda('2026-10-10', 'Volta à pousada', 'noite', '19:00'),
 
-    // 11/10 (dom) — Paraty, sem rotina-base
+    // 11/10 (dom) — Paraty
+    ...rotinaCompleta('2026-10-11'),
     agenda('2026-10-11', 'Saída rumo a Paraty-Mirim', 'manha', '08:00'),
     agenda('2026-10-11', 'Praia do Sono + Poço do Jacaré', 'manha', '09:40–14:00'),
     agenda('2026-10-11', 'Volta pela trilha', 'tarde', '14:00'),
     agenda('2026-10-11', 'Pousada, banho', 'tarde', '16:10'),
     agenda('2026-10-11', 'Centrinho + jantar', 'noite', '17:00–19:00'),
 
-    // 12/10 (seg) — volta, sem rotina-base
+    // 12/10 (seg) — volta
+    ...rotinaCompleta('2026-10-12'),
     agenda('2026-10-12', 'Café da manhã no Café Café', 'manha', '08:00'),
     agenda('2026-10-12', 'Última volta pelo Centro Histórico', 'manha', '09:00'),
     agenda('2026-10-12', 'Saída de Paraty', 'manha', '10:00–11:00'),

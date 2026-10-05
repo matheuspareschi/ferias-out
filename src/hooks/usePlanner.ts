@@ -65,10 +65,26 @@ function ensureDailyHabits(items: Item[], dayId: string): Item[] {
   return [...items, ...created]
 }
 
+/**
+ * Backfill de hábitos pra TODO dia já presente nos itens (4.?: hábitos
+ * valem pro dia inteiro de calendário, sem exceção — viagem/retiro/sábado
+ * incluídos). Sem isso, um dia só ganharia o conjunto completo de hábitos
+ * se tivesse sido a âncora alguma vez; dados antigos (de antes do 6º
+ * hábito, por exemplo) ficariam pra sempre incompletos.
+ */
+function ensureHabitsForAllDays(items: Item[]): Item[] {
+  const dayIds = new Set(items.filter((it): it is Item & { dayId: string } => Boolean(it.dayId)).map((it) => it.dayId))
+  let result = items
+  for (const dayId of dayIds) {
+    result = ensureDailyHabits(result, dayId)
+  }
+  return result
+}
+
 function seedState(): PlannerState {
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    items: ensureDailyHabits(buildSeedItems(), defaultAnchorDayId()),
+    items: ensureHabitsForAllDays(ensureDailyHabits(buildSeedItems(), defaultAnchorDayId())),
     contexts: DEFAULT_CONTEXTS,
     dayMeta: {},
     anchorDayId: defaultAnchorDayId(),
@@ -97,7 +113,7 @@ function loadState(): PlannerState {
       const parsed = JSON.parse(raw)
       if (needsMigration(parsed)) backupLegacyBlobIfNeeded(raw)
       const normalized = normalizeState(parsed)
-      if (normalized) return withTodayAnchor(normalized)
+      if (normalized) return withTodayAnchor({ ...normalized, items: ensureHabitsForAllDays(normalized.items) })
     }
   } catch {
     // localStorage indisponível ou dados corrompidos — cai para o seed

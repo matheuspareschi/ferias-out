@@ -2,11 +2,14 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
 import { addDays, addMonths, daysInMonthCount, monthIdOf, todayId, weekdayIndexOf } from '@/lib/dates'
-import { formatDayShort } from '@/lib/days'
+import { formatDayShort, isFutureDay } from '@/lib/days'
 import { HABIT_ICON, HABIT_LABEL, HABIT_ORDER } from '@/lib/habits'
 import { monthWeeks, yearWeeks } from '@/lib/habitGrid'
 import type { HabitId, Item } from '@/lib/types'
 import { cn } from '@/lib/utils'
+
+const WEEKDAY_INITIALS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
+const MONTH_ABBR = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
 
 interface HabitosPageProps {
   planner: UsePlannerReturn
@@ -52,6 +55,7 @@ export function HabitosPage({ planner }: HabitosPageProps) {
         </div>
       </div>
 
+      {view !== 'resumo' && <Legend />}
       {view === 'mes' && <MesView items={planner.items} />}
       {view === 'ano' && <AnoView items={planner.items} />}
       {view === 'porHabito' && <PorHabitoView items={planner.items} />}
@@ -60,19 +64,42 @@ export function HabitosPage({ planner }: HabitosPageProps) {
   )
 }
 
-/** Quadradinho de estado: feito / pendente (existe mas não feito) / sem dado (dia nunca aberto). */
-function HabitCell({ state, title }: { state: 'done' | 'pending' | 'nodata'; title?: string }) {
+function Legend() {
   return (
-    <div
-      title={title}
-      className={cn(
-        'size-3 rounded-[2px]',
-        state === 'done' && 'bg-done',
-        state === 'pending' && 'border border-line',
-        state === 'nodata' && 'bg-transparent',
-      )}
-    />
+    <div className="flex items-center gap-4 font-mono text-[10px] text-ink-faint">
+      <span className="flex items-center gap-1.5">
+        <span className="size-3 rounded-[2px] bg-done" /> feito
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="size-3 rounded-[2px] border border-line" /> não feito
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="flex size-3 items-center justify-center">
+          <span className="size-1 rounded-full bg-ink-faint/50" />
+        </span>
+        futuro
+      </span>
+    </div>
   )
+}
+
+/** Variante visual de um dia: feito (quadrado cheio) / não feito (quadrado vazio) / futuro (pontinho — nunca uma caixa vazia, pra não parecer falha). */
+type HabitCellVariant = 'done' | 'empty' | 'future'
+
+function habitCellVariant(items: Item[], habit: HabitId, dayId: string): HabitCellVariant {
+  if (isFutureDay(dayId)) return 'future'
+  return habitItemOn(items, habit, dayId)?.done ? 'done' : 'empty'
+}
+
+function HabitCell({ variant, title }: { variant: HabitCellVariant; title?: string }) {
+  if (variant === 'future') {
+    return (
+      <div title={title} className="flex size-3 items-center justify-center">
+        <span className="size-1 rounded-full bg-ink-faint/50" />
+      </div>
+    )
+  }
+  return <div title={title} className={cn('size-3 rounded-[2px]', variant === 'done' ? 'bg-done' : 'border border-line')} />
 }
 
 function MesView({ items }: { items: Item[] }) {
@@ -98,8 +125,16 @@ function MesView({ items }: { items: Item[] }) {
             <tr>
               <th className="w-28" />
               {days.map((d) => (
-                <th key={d} className={cn('w-4 pb-1 font-mono text-[9px] font-normal text-ink-faint', d === today && 'text-accent')}>
+                <th key={d} className={cn('w-4 pb-0 font-mono text-[9px] font-normal text-ink-faint', d === today && 'text-accent')}>
                   {d.slice(-2)}
+                </th>
+              ))}
+            </tr>
+            <tr>
+              <th className="w-28" />
+              {days.map((d) => (
+                <th key={d} className={cn('w-4 pb-1 font-mono text-[8px] font-normal uppercase text-ink-faint/70', d === today && 'text-accent')}>
+                  {WEEKDAY_INITIALS[weekdayIndexOf(d)]}
                 </th>
               ))}
             </tr>
@@ -114,14 +149,11 @@ function MesView({ items }: { items: Item[] }) {
                       <Icon className="size-3" /> {HABIT_LABEL[habit]}
                     </span>
                   </td>
-                  {days.map((d) => {
-                    const item = habitItemOn(items, habit, d)
-                    return (
-                      <td key={d} className="px-0.5 py-0.5">
-                        <HabitCell state={item ? (item.done ? 'done' : 'pending') : 'nodata'} title={d} />
-                      </td>
-                    )
-                  })}
+                  {days.map((d) => (
+                    <td key={d} className="px-0.5 py-0.5">
+                      <HabitCell variant={habitCellVariant(items, habit, d)} title={d} />
+                    </td>
+                  ))}
                 </tr>
               )
             })}
@@ -158,19 +190,13 @@ function HabitPicker({ value, onChange, includeAll }: { value: HabitId | 'todos'
   )
 }
 
-/** -1 = sem dado, 0 = nenhum feito, 1..5 = quantos hábitos feitos naquele dia. */
+/** 0 = nenhum feito, 1..6 = quantos hábitos feitos naquele dia (dia passado/hoje). */
 function intensityForDay(items: Item[], dayId: string, habit: HabitId | 'todos'): number {
-  if (habit !== 'todos') {
-    const item = habitItemOn(items, habit, dayId)
-    return item ? (item.done ? 1 : 0) : -1
-  }
-  const dayHabits = items.filter((it) => it.dayId === dayId && it.habit)
-  if (dayHabits.length === 0) return -1
-  return dayHabits.filter((it) => it.done).length
+  if (habit !== 'todos') return habitItemOn(items, habit, dayId)?.done ? 1 : 0
+  return items.filter((it) => it.dayId === dayId && it.habit && it.done).length
 }
 
 function intensityClass(intensity: number, max: number): string {
-  if (intensity < 0) return 'bg-transparent border border-line/60'
   if (intensity === 0) return 'border border-line'
   const ratio = intensity / max
   if (ratio >= 1) return 'bg-done'
@@ -179,10 +205,19 @@ function intensityClass(intensity: number, max: number): string {
   return 'bg-done/20'
 }
 
+/** Rótulo de mês pra coluna da semana que contém o dia 1 — `null` nas demais (estilo grade do GitHub). */
+function monthLabelsForWeeks(weeks: (string | null)[][]): (string | null)[] {
+  return weeks.map((week) => {
+    const firstOfMonth = week.find((d) => d?.endsWith('-01'))
+    return firstOfMonth ? MONTH_ABBR[Number(firstOfMonth.slice(5, 7)) - 1] : null
+  })
+}
+
 function AnoView({ items }: { items: Item[] }) {
   const [year, setYear] = useState(Number(todayId().slice(0, 4)))
   const [habit, setHabit] = useState<HabitId | 'todos'>('todos')
   const weeks = yearWeeks(year)
+  const monthLabels = monthLabelsForWeeks(weeks)
   const max = habit === 'todos' ? HABIT_ORDER.length : 1
 
   return (
@@ -197,18 +232,32 @@ function AnoView({ items }: { items: Item[] }) {
         </button>
       </div>
       <HabitPicker value={habit} onChange={setHabit} includeAll />
-      <div className="flex gap-0.5 overflow-x-auto pb-1">
-        {weeks.map((week, wi) => (
-          <div key={wi} className="flex flex-col gap-0.5">
-            {week.map((d, di) => (
-              <div
-                key={di}
-                title={d ?? undefined}
-                className={cn('size-2.5 rounded-[2px]', d === null ? 'opacity-0' : intensityClass(intensityForDay(items, d, habit), max))}
-              />
-            ))}
-          </div>
-        ))}
+      <div className="flex gap-1 overflow-x-auto pb-1">
+        <div className="flex flex-col gap-0.5 pt-[18px]">
+          {WEEKDAY_INITIALS.map((w, i) => (
+            <span key={i} className="flex size-2.5 items-center justify-center font-mono text-[7px] text-ink-faint/70">
+              {w}
+            </span>
+          ))}
+        </div>
+        <div className="flex gap-0.5">
+          {weeks.map((week, wi) => (
+            <div key={wi} className="flex flex-col gap-0.5">
+              <span className="block h-[14px] font-mono text-[8px] uppercase text-ink-faint">{monthLabels[wi] ?? ''}</span>
+              {week.map((d, di) =>
+                d === null ? (
+                  <div key={di} className="size-2.5 opacity-0" />
+                ) : isFutureDay(d) ? (
+                  <div key={di} title={d} className="flex size-2.5 items-center justify-center">
+                    <span className="size-1 rounded-full bg-ink-faint/50" />
+                  </div>
+                ) : (
+                  <div key={di} title={d} className={cn('size-2.5 rounded-[2px]', intensityClass(intensityForDay(items, d, habit), max))} />
+                ),
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   )
@@ -235,19 +284,23 @@ function PorHabitoView({ items }: { items: Item[] }) {
         {months.map((monthId) => (
           <div key={monthId} className="flex flex-col gap-1">
             <p className="text-[10px] uppercase tracking-wide text-ink-faint">{monthLabel(monthId)}</p>
+            <div className="flex gap-0.5">
+              {WEEKDAY_INITIALS.map((w, i) => (
+                <span key={i} className="flex size-3 items-center justify-center font-mono text-[7px] text-ink-faint/70">
+                  {w}
+                </span>
+              ))}
+            </div>
             <div className="flex flex-col gap-0.5">
               {monthWeeks(monthId).map((week, wi) => (
                 <div key={wi} className="flex gap-0.5">
-                  {week.map((d, di) => (
-                    <HabitCell
-                      key={di}
-                      title={d ?? undefined}
-                      state={d === null ? 'nodata' : (() => {
-                        const item = habitItemOn(items, habit, d)
-                        return item ? (item.done ? 'done' : 'pending') : 'nodata'
-                      })()}
-                    />
-                  ))}
+                  {week.map((d, di) =>
+                    d === null ? (
+                      <div key={di} className="size-3 opacity-0" />
+                    ) : (
+                      <HabitCell key={di} title={d} variant={habitCellVariant(items, habit, d)} />
+                    ),
+                  )}
                 </div>
               ))}
             </div>
