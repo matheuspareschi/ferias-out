@@ -57,6 +57,7 @@ function FaculdadeItemLine({ item, dayId, onToggle, onUnschedule }: { item: Item
         type={item.type}
         done={item.done}
         delivery={item.isDelivery}
+        review={item.unitRole === 'revisao' || item.unitRole === 'revisao_continua'}
         onChange={onToggle}
         size="sm"
         className={cn('mt-px shrink-0', overdue && 'text-attention')}
@@ -205,7 +206,7 @@ export function FaculdadeCalendarPage({ planner, month, onMonthChange }: Faculda
         </button>
       </div>
 
-      <div className="mx-auto w-full max-w-4xl overflow-hidden rounded-sm border border-line">
+      <div className="mx-auto w-full max-w-4xl rounded-sm border border-line">
         <div className="grid grid-cols-7 gap-px bg-line">
           {WEEKDAY_HEADERS.map((w) => (
             <div key={w} className="bg-paper-raised px-1 py-1 text-center font-mono text-[9px] uppercase tracking-wide text-ink-faint">

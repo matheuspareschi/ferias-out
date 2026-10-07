@@ -21,7 +21,7 @@ const sectionClass = 'flex flex-col gap-3 rounded-sm border border-line bg-paper
 
 export function FaculdadePage({ planner }: FaculdadePageProps) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 overflow-y-auto pb-4">
       <h1 className="font-serif text-lg font-semibold">Faculdade</h1>
       <UnitsGrid planner={planner} />
       <ContinuousReviewSection planner={planner} />
@@ -54,7 +54,7 @@ function ContinuousReviewSection({ planner }: { planner: UsePlannerReturn }) {
       <ul className="flex flex-wrap gap-x-4 gap-y-1">
         {entries.map((item) => (
           <li key={item.id} className="flex items-center gap-1">
-            <ItemGlyph type="task" done={item.done} onChange={() => planner.toggleDone(item.id)} size="sm" />
+            <ItemGlyph type="task" review done={item.done} onChange={() => planner.toggleDone(item.id)} size="sm" />
             <span className="font-mono text-[10px] text-ink-dim">{item.dayId}</span>
           </li>
         ))}
@@ -63,9 +63,15 @@ function ContinuousReviewSection({ planner }: { planner: UsePlannerReturn }) {
   )
 }
 
+/**
+ * Menu de disciplinas como abas (em vez de empilhar a tabela de todas):
+ * clica numa sigla ali em cima e só a tabela dela aparece embaixo — a
+ * lista ficava "muito extensa" com as sete disciplinas sempre visíveis.
+ */
 function UnitsGrid({ planner }: { planner: UsePlannerReturn }) {
   const { disciplines, units, items } = planner
-  const [disciplineId, setDisciplineId] = useState(disciplines[0]?.id ?? '')
+  const [activeDisciplineId, setActiveDisciplineId] = useState(disciplines[0]?.id ?? '')
+  const activeDiscipline = disciplines.find((d) => d.id === activeDisciplineId) ?? disciplines[0]
   const [number, setNumber] = useState('')
   const [size, setSize] = useState<ItemSize>('M')
   const [pages, setPages] = useState('')
@@ -75,13 +81,13 @@ function UnitsGrid({ planner }: { planner: UsePlannerReturn }) {
   function handleAddUnit(e: FormEvent) {
     e.preventDefault()
     const n = Number(number)
-    if (!disciplineId || !Number.isFinite(n) || n <= 0) return
+    if (!activeDiscipline || !Number.isFinite(n) || n <= 0) return
     const validDay = dayId ? validateDateInput(dayId) : null
     if (dayId && !validDay) {
       setDayError('data inválida')
       return
     }
-    planner.addUnit(disciplineId, n, size, pages ? Number(pages) : undefined, validDay ?? undefined)
+    planner.addUnit(activeDiscipline.id, n, size, pages ? Number(pages) : undefined, validDay ?? undefined)
     setNumber('')
     setPages('')
     setDayId('')
@@ -94,105 +100,113 @@ function UnitsGrid({ planner }: { planner: UsePlannerReturn }) {
     }
   }
 
+  const disciplineUnits = activeDiscipline
+    ? units.filter((u) => u.disciplineId === activeDiscipline.id).sort((a, b) => a.number - b.number)
+    : []
+
   return (
     <section className={sectionClass}>
       <h2 className="font-serif text-base font-semibold">Disciplinas e unidades</h2>
-      {disciplines.map((discipline) => {
-        const disciplineUnits = units.filter((u) => u.disciplineId === discipline.id).sort((a, b) => a.number - b.number)
-        return (
-          <div key={discipline.id} className="flex flex-col gap-1.5">
-            <p className="text-xs font-semibold text-ink-dim">
-              {discipline.sigla} <span className="font-normal text-ink-faint">— {discipline.name}</span>
-            </p>
-            {disciplineUnits.length === 0 ? (
-              <p className="px-1 font-mono text-[10px] text-ink-faint">nenhuma unidade ainda</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[480px] border-collapse text-xs">
-                  <thead>
-                    <tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-ink-faint">
-                      <th className="py-1 pr-2 font-normal">Unidade</th>
-                      <th className="px-2 py-1 font-normal">Aula</th>
-                      <th className="px-2 py-1 font-normal">Rev. 1</th>
-                      <th className="px-2 py-1 font-normal">Rev. 2</th>
-                      <th className="px-2 py-1 font-normal">Rev. 3</th>
-                      <th className="px-2 py-1 font-normal">Tam.</th>
-                      <th className="px-2 py-1 font-normal">Págs.</th>
-                      <th className="py-1 pl-2" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {disciplineUnits.map((unit) => {
-                      const aula = items.find((it) => it.unitId === unit.id && it.unitRole === 'aula')
-                      const reviews: (Item | undefined)[] = [1, 2, 3].map((idx) =>
-                        items.find((it) => it.unitId === unit.id && it.unitRole === 'revisao' && it.reviewIndex === idx),
-                      )
-                      const label = `${discipline.sigla}${unit.number}`
-                      return (
-                        <tr key={unit.id} className="border-b border-line/60 last:border-0">
-                          <td className="py-1.5 pr-2 font-mono">{label}</td>
-                          <td className="px-2 py-1.5">
-                            {aula && (
+
+      <div className="flex flex-wrap gap-1 border-b border-line pb-2">
+        {disciplines.map((d) => (
+          <button
+            key={d.id}
+            type="button"
+            onClick={() => setActiveDisciplineId(d.id)}
+            className={cn(
+              'rounded-sm px-2 py-1 font-mono text-xs transition-colors',
+              d.id === activeDisciplineId ? 'bg-ink text-paper' : 'text-ink-dim hover:bg-paper-dim hover:text-ink',
+            )}
+          >
+            {d.sigla}
+          </button>
+        ))}
+      </div>
+
+      {activeDiscipline && (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs font-semibold text-ink-dim">
+            {activeDiscipline.sigla} <span className="font-normal text-ink-faint">— {activeDiscipline.name}</span>
+          </p>
+          {disciplineUnits.length === 0 ? (
+            <p className="px-1 font-mono text-[10px] text-ink-faint">nenhuma unidade ainda</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[480px] border-collapse text-xs">
+                <thead>
+                  <tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-ink-faint">
+                    <th className="py-1 pr-2 font-normal">Unidade</th>
+                    <th className="px-2 py-1 font-normal">Aula</th>
+                    <th className="px-2 py-1 font-normal">Rev. 1</th>
+                    <th className="px-2 py-1 font-normal">Rev. 2</th>
+                    <th className="px-2 py-1 font-normal">Rev. 3</th>
+                    <th className="px-2 py-1 font-normal">Tam.</th>
+                    <th className="px-2 py-1 font-normal">Págs.</th>
+                    <th className="py-1 pl-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {disciplineUnits.map((unit) => {
+                    const aula = items.find((it) => it.unitId === unit.id && it.unitRole === 'aula')
+                    const reviews: (Item | undefined)[] = [1, 2, 3].map((idx) =>
+                      items.find((it) => it.unitId === unit.id && it.unitRole === 'revisao' && it.reviewIndex === idx),
+                    )
+                    const label = `${activeDiscipline.sigla}${unit.number}`
+                    return (
+                      <tr key={unit.id} className="border-b border-line/60 last:border-0">
+                        <td className="py-1.5 pr-2 font-mono">{label}</td>
+                        <td className="px-2 py-1.5">
+                          {aula && (
+                            <div className="flex flex-col items-start gap-0.5">
+                              <ItemGlyph type="task" done={aula.done} onChange={() => planner.toggleDone(aula.id)} />
+                              <InlineDateEditor
+                                value={aula.dayId}
+                                onConfirm={(d) => planner.updateItem(aula.id, { dayId: d, period: null })}
+                                onClear={() => planner.updateItem(aula.id, { dayId: undefined, period: undefined })}
+                              />
+                            </div>
+                          )}
+                        </td>
+                        {reviews.map((review, idx) => (
+                          <td key={idx} className="px-2 py-1.5">
+                            {review ? (
                               <div className="flex flex-col items-start gap-0.5">
-                                <ItemGlyph type="task" done={aula.done} onChange={() => planner.toggleDone(aula.id)} />
+                                <ItemGlyph type="task" review done={review.done} onChange={() => planner.toggleDone(review.id)} />
                                 <InlineDateEditor
-                                  value={aula.dayId}
-                                  onConfirm={(d) => planner.updateItem(aula.id, { dayId: d, period: null })}
-                                  onClear={() => planner.updateItem(aula.id, { dayId: undefined, period: undefined })}
+                                  value={review.dayId}
+                                  onConfirm={(d) => planner.updateItem(review.id, { dayId: d, period: null })}
+                                  onClear={() => planner.updateItem(review.id, { dayId: undefined, period: undefined })}
                                 />
                               </div>
+                            ) : (
+                              <span className="text-ink-faint">—</span>
                             )}
                           </td>
-                          {reviews.map((review, idx) => (
-                            <td key={idx} className="px-2 py-1.5">
-                              {review ? (
-                                <div className="flex flex-col items-start gap-0.5">
-                                  <ItemGlyph type="task" done={review.done} onChange={() => planner.toggleDone(review.id)} />
-                                  <InlineDateEditor
-                                    value={review.dayId}
-                                    onConfirm={(d) => planner.updateItem(review.id, { dayId: d, period: null })}
-                                    onClear={() => planner.updateItem(review.id, { dayId: undefined, period: undefined })}
-                                  />
-                                </div>
-                              ) : (
-                                <span className="text-ink-faint">—</span>
-                              )}
-                            </td>
-                          ))}
-                          <td className="px-2 py-1.5 font-mono">{unit.size}</td>
-                          <td className="px-2 py-1.5 font-mono">{unit.pages ?? '—'}</td>
-                          <td className="py-1.5 pl-2">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteUnit(unit.id, label)}
-                              className="text-ink-faint hover:text-attention"
-                              aria-label={`Excluir unidade ${label}`}
-                            >
-                              <Trash2 className="size-3" />
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )
-      })}
+                        ))}
+                        <td className="px-2 py-1.5 font-mono">{unit.size}</td>
+                        <td className="px-2 py-1.5 font-mono">{unit.pages ?? '—'}</td>
+                        <td className="py-1.5 pl-2">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteUnit(unit.id, label)}
+                            className="text-ink-faint hover:text-attention"
+                            aria-label={`Excluir unidade ${label}`}
+                          >
+                            <Trash2 className="size-3" />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       <form onSubmit={handleAddUnit} className="flex flex-wrap items-end gap-2 border-t border-line pt-3">
-        <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wide text-ink-faint">
-          Disciplina
-          <select value={disciplineId} onChange={(e) => setDisciplineId(e.target.value)} className={inputClass}>
-            {disciplines.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.sigla}
-              </option>
-            ))}
-          </select>
-        </label>
         <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wide text-ink-faint">
           Número
           <input
@@ -245,7 +259,7 @@ function UnitsGrid({ planner }: { planner: UsePlannerReturn }) {
           />
         </label>
         <button type="submit" className="rounded-sm bg-ink px-3 py-1.5 text-xs text-paper hover:bg-accent">
-          adicionar unidade
+          adicionar unidade em {activeDiscipline?.sigla}
         </button>
       </form>
     </section>

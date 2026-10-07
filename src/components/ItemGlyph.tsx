@@ -11,6 +11,8 @@ interface ItemGlyphProps {
   subtask?: boolean
   /** Entrega da Faculdade: símbolo ★ no lugar do símbolo de tipo (3.1). */
   delivery?: boolean
+  /** Revisão (de Unidade ou contínua): triângulo em vez do quadrado de aula/tarefa. */
+  review?: boolean
   onChange: () => void
   size?: 'sm' | 'md'
   className?: string
@@ -21,9 +23,9 @@ interface ItemGlyphProps {
 /**
  * Símbolo clicável no estilo bullet journal — nunca uma caixa preenchida.
  * Prioridade de símbolo: feita (✕) > migrada (`>`) > subtarefa (traço) >
- * entrega (★) > tipo (caixa/losango).
+ * entrega (★) > revisão (▲) > tipo (caixa/losango).
  */
-export function ItemGlyph({ type, done, migrated, subtask, delivery, onChange, size = 'sm', className, interactive = true }: ItemGlyphProps) {
+export function ItemGlyph({ type, done, migrated, subtask, delivery, review, onChange, size = 'sm', className, interactive = true }: ItemGlyphProps) {
   const dim = size === 'sm' ? 14 : 16
   const Tag = interactive ? 'button' : 'span'
 
@@ -57,6 +59,10 @@ export function ItemGlyph({ type, done, migrated, subtask, delivery, onChange, s
         <span className="block h-px w-2.5 bg-ink-faint" aria-hidden />
       ) : delivery ? (
         <Star size={dim - 4} strokeWidth={1.5} aria-hidden />
+      ) : review ? (
+        <svg width={dim - 4} height={dim - 4} viewBox="0 0 10 10" fill="none" aria-hidden>
+          <path d="M5 0.75L9.25 9.25H0.75L5 0.75Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+        </svg>
       ) : type === 'event' ? (
         <svg width={dim - 4} height={dim - 4} viewBox="0 0 10 10" fill="none" aria-hidden>
           <circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.3" />
