@@ -66,8 +66,12 @@ export interface Item {
   parentId?: string
   /** Liga o item a uma Unidade da Faculdade — só em itens de aula/revisão. */
   unitId?: string
-  /** Papel do item dentro da Unidade (ver `unitId`). */
-  unitRole?: 'aula' | 'revisao'
+  /**
+   * Papel do item dentro da Unidade (ver `unitId`) — `revisao_continua` não
+   * tem `unitId` (não é de uma Unidade específica): é o acompanhamento
+   * diário de Hebraico, um item por dia (ver `ensureContinuousReview`).
+   */
+  unitRole?: 'aula' | 'revisao' | 'revisao_continua'
   /** Só em revisões: qual das 3 (1, 2 ou 3) — usado pra não duplicar. */
   reviewIndex?: 1 | 2 | 3
   /** Entrega da Faculdade — mostra ★ em vez do símbolo normal de tipo. */

@@ -2,6 +2,8 @@ import { Cloud, CloudOff, Download, Moon, Plug, RefreshCw, Sun, Upload } from 'l
 import { useRef, useState, type ChangeEvent } from 'react'
 import { AnoPage } from '@/components/ano/AnoPage'
 import { BacklogPage } from '@/components/backlog/BacklogPage'
+import { FaculdadeCalendarPage } from '@/components/faculdade/FaculdadeCalendarPage'
+import { FaculdadePage } from '@/components/faculdade/FaculdadePage'
 import { HabitosPage } from '@/components/habitos/HabitosPage'
 import { HojePage } from '@/components/hoje/HojePage'
 import { MesPage } from '@/components/mes/MesPage'
@@ -77,8 +79,9 @@ export default function App() {
   const syncedPlanner = useGoogleSyncedPlanner(planner, google)
   const { theme, toggle } = useTheme()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [section, setSection] = useState<SectionId>('semana')
+  const [section, setSection] = useState<SectionId>('faculdade-mes')
   const [mesMonth, setMesMonth] = useState(monthIdOf(todayId()))
+  const [facMonth, setFacMonth] = useState(monthIdOf(todayId()))
   const [retroMonth, setRetroMonth] = useState(monthIdOf(todayId()))
 
   function goToMonth(month: string) {
@@ -160,7 +163,11 @@ export default function App() {
       </header>
 
       <main className="flex flex-1 flex-col overflow-y-auto p-3 sm:p-4 lg:overflow-hidden">
-        {section === 'semana' ? (
+        {section === 'faculdade-mes' ? (
+          <FaculdadeCalendarPage planner={syncedPlanner} month={facMonth} onMonthChange={setFacMonth} />
+        ) : section === 'faculdade-geral' ? (
+          <FaculdadePage planner={syncedPlanner} />
+        ) : section === 'semana' ? (
           <HojePage planner={syncedPlanner} />
         ) : section === 'projetos' ? (
           <ProjetosPage planner={syncedPlanner} />

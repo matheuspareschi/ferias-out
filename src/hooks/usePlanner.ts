@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_CONTEXT_ID, DEFAULT_CONTEXTS } from '@/lib/contexts'
 import { defaultAnchorDayId } from '@/lib/days'
-import { DEFAULT_DISCIPLINES } from '@/lib/disciplines'
+import { DEFAULT_DISCIPLINES, ensureDefaultDisciplines } from '@/lib/disciplines'
 import { syncUnitReviews } from '@/lib/facultyReviews'
 import { HABIT_LABEL, HABIT_ORDER } from '@/lib/habits'
 import { purgeOldTrash, recoverInvalidDates } from '@/lib/itemVisibility'
@@ -82,6 +82,33 @@ function ensureHabitsForAllDays(items: Item[]): Item[] {
   return result
 }
 
+/** Disciplina com acompanhamento contínuo de revisão (por hora, só Hebraico Bíblico). */
+const CONTINUOUS_REVIEW_DISCIPLINE_ID = 'hb'
+
+/**
+ * Garante o item do dia de revisão contínua de uma disciplina (Hebraico) —
+ * um item por dia, feito/não feito, sem ligação a Unidade nenhuma. Só pra
+ * frente a partir de quando a âncora passa por ali, sem backfill retroativo
+ * (não existia antes de hoje).
+ */
+function ensureContinuousReview(items: Item[], dayId: string, disciplineId: string): Item[] {
+  const exists = items.some((it) => it.dayId === dayId && it.disciplineId === disciplineId && it.unitRole === 'revisao_continua')
+  if (exists) return items
+  const created: Item = {
+    id: newId('revcont'),
+    type: 'task',
+    title: 'Revisão de Hebraico',
+    context: 'faculdade',
+    disciplineId,
+    unitRole: 'revisao_continua',
+    dayId,
+    period: null,
+    order: 0,
+    done: false,
+  }
+  return [...items, created]
+}
+
 function seedState(): PlannerState {
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -129,6 +156,7 @@ function loadState(): PlannerState {
           ...normalized,
           items: ensureHabitsForAllDays(recovered),
           trash: purgeOldTrash(normalized.trash),
+          disciplines: ensureDefaultDisciplines(normalized.disciplines),
         })
       }
     }
@@ -163,12 +191,13 @@ export function usePlanner() {
     }
   }, [state])
 
-  // Garante os hábitos do dia sempre que a âncora muda (inclusive no primeiro
-  // load, já que ela começa em hoje) — idempotente: se nada falta, devolve a
-  // mesma referência de `items` e o React não re-renderiza à toa.
+  // Garante os hábitos e a revisão contínua de Hebraico do dia sempre que a
+  // âncora muda (inclusive no primeiro load, já que ela começa em hoje) —
+  // idempotente: se nada falta, devolve a mesma referência de `items` e o
+  // React não re-renderiza à toa.
   useEffect(() => {
     setState((s) => {
-      const items = ensureDailyHabits(s.items, s.anchorDayId)
+      const items = ensureContinuousReview(ensureDailyHabits(s.items, s.anchorDayId), s.anchorDayId, CONTINUOUS_REVIEW_DISCIPLINE_ID)
       return items === s.items ? s : { ...s, items }
     })
   }, [state.anchorDayId])
@@ -477,8 +506,12 @@ export function usePlanner() {
     return id
   }, [])
 
-  /** Cria a Unidade e, junto, o Item de "aula" ligado a ela (3.1 — alimenta backlog/dias como qualquer tarefa). */
-  const addUnit = useCallback((disciplineId: string, number: number, size: ItemSize, pages?: number): string => {
+  /**
+   * Cria a Unidade e, junto, o Item de "aula" ligado a ela (3.1 — alimenta
+   * backlog/dias como qualquer tarefa). Com `dayId`, a aula já nasce
+   * agendada naquele dia (alocação direta na hora de cadastrar).
+   */
+  const addUnit = useCallback((disciplineId: string, number: number, size: ItemSize, pages?: number, dayId?: string): string => {
     const unitId = newId('unidade')
     setState((s) => {
       const discipline = s.disciplines.find((d) => d.id === disciplineId)
@@ -493,6 +526,8 @@ export function usePlanner() {
         done: false,
         unitId,
         unitRole: 'aula',
+        dayId,
+        period: dayId ? null : undefined,
       }
       return {
         ...s,

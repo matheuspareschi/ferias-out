@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { todayId } from './dates'
+import { DEFAULT_DISCIPLINES } from './disciplines'
 import { CURRENT_SCHEMA_VERSION, needsMigration, normalizeState } from './migrations'
 
 describe('normalizeState — v0 (AgendaItem/BacklogItem) → v2', () => {
@@ -197,7 +198,7 @@ describe('normalizeState — v2 (sem Faculdade) → v3', () => {
   it('seeds the default discipline list and starts with no units', () => {
     const result = normalizeState(v2State())
     expect(result?.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
-    expect(result?.disciplines.map((d) => d.sigla)).toEqual(['HB', 'HC', 'AT', 'NT', 'EC'])
+    expect(result?.disciplines.map((d) => d.sigla)).toEqual(DEFAULT_DISCIPLINES.map((d) => d.sigla))
     expect(result?.units).toEqual([])
     expect(result?.facultyNotes).toEqual({ general: '', byDiscipline: {} })
   })

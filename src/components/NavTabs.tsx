@@ -2,9 +2,21 @@ import { Menu, X } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
-export type SectionId = 'semana' | 'mes' | 'ano' | 'habitos' | 'backlog' | 'projetos' | 'retrospectiva'
+export type SectionId =
+  | 'semana'
+  | 'mes'
+  | 'ano'
+  | 'habitos'
+  | 'backlog'
+  | 'projetos'
+  | 'retrospectiva'
+  | 'faculdade-mes'
+  | 'faculdade-geral'
 
-const SECTIONS: { id: SectionId; label: string }[] = [
+/** Todas as seções já existentes no app — continuam roteadas no App.tsx, só não ficam no menu por hora (ver ALL_SECTIONS/mudança radical faculdade-only). */
+const ALL_SECTIONS: { id: SectionId; label: string }[] = [
+  { id: 'faculdade-mes', label: 'Calendário' },
+  { id: 'faculdade-geral', label: 'Disciplinas' },
   { id: 'semana', label: 'Semana' },
   { id: 'mes', label: 'Mês' },
   { id: 'ano', label: 'Ano' },
@@ -13,6 +25,10 @@ const SECTIONS: { id: SectionId; label: string }[] = [
   { id: 'projetos', label: 'Projetos' },
   { id: 'retrospectiva', label: 'Retrospectiva' },
 ]
+
+/** Por hora o app é só-faculdade: o resto fica escondido do menu, mas continua funcionando se reativado. */
+const HIDDEN_SECTION_IDS = new Set<SectionId>(['semana', 'mes', 'ano', 'habitos', 'backlog', 'projetos', 'retrospectiva'])
+const SECTIONS = ALL_SECTIONS.filter((s) => !HIDDEN_SECTION_IDS.has(s.id))
 
 interface NavTabsProps {
   active: SectionId

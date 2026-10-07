@@ -1,9 +1,10 @@
 import { Trash2 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { BlurSavedTextarea } from '@/components/BlurSavedField'
+import { InlineDateEditor } from '@/components/InlineDateEditor'
 import { ItemGlyph } from '@/components/ItemGlyph'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
-import { todayId } from '@/lib/dates'
+import { todayId, validateDateInput } from '@/lib/dates'
 import type { Item, ItemSize, LiveClassStatus } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -23,10 +24,42 @@ export function FaculdadePage({ planner }: FaculdadePageProps) {
     <div className="flex flex-col gap-4">
       <h1 className="font-serif text-lg font-semibold">Faculdade</h1>
       <UnitsGrid planner={planner} />
+      <ContinuousReviewSection planner={planner} />
       <LiveClassesSection planner={planner} />
       <DeliveriesSection planner={planner} />
       <NotesSection disciplines={planner.disciplines} facultyNotes={planner.facultyNotes} onSetFacultyNote={planner.setFacultyNote} />
     </div>
+  )
+}
+
+/** Acompanhamento contínuo de Hebraico (4): um item por dia, gerado sozinho — aqui só marca feito/não feito. */
+function ContinuousReviewSection({ planner }: { planner: UsePlannerReturn }) {
+  const entries = planner.items
+    .filter((it) => it.unitRole === 'revisao_continua')
+    .sort((a, b) => (b.dayId ?? '').localeCompare(a.dayId ?? ''))
+    .slice(0, 14)
+
+  if (entries.length === 0) return null
+
+  const doneCount = entries.filter((it) => it.done).length
+
+  return (
+    <section className={sectionClass}>
+      <div className="flex items-center justify-between">
+        <h2 className="font-serif text-base font-semibold">Revisão contínua — Hebraico</h2>
+        <span className="font-mono text-[10px] text-ink-faint">
+          {doneCount}/{entries.length} últimos dias
+        </span>
+      </div>
+      <ul className="flex flex-wrap gap-x-4 gap-y-1">
+        {entries.map((item) => (
+          <li key={item.id} className="flex items-center gap-1">
+            <ItemGlyph type="task" done={item.done} onChange={() => planner.toggleDone(item.id)} size="sm" />
+            <span className="font-mono text-[10px] text-ink-dim">{item.dayId}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
@@ -36,14 +69,23 @@ function UnitsGrid({ planner }: { planner: UsePlannerReturn }) {
   const [number, setNumber] = useState('')
   const [size, setSize] = useState<ItemSize>('M')
   const [pages, setPages] = useState('')
+  const [dayId, setDayId] = useState('')
+  const [dayError, setDayError] = useState<string | null>(null)
 
   function handleAddUnit(e: FormEvent) {
     e.preventDefault()
     const n = Number(number)
     if (!disciplineId || !Number.isFinite(n) || n <= 0) return
-    planner.addUnit(disciplineId, n, size, pages ? Number(pages) : undefined)
+    const validDay = dayId ? validateDateInput(dayId) : null
+    if (dayId && !validDay) {
+      setDayError('data inválida')
+      return
+    }
+    planner.addUnit(disciplineId, n, size, pages ? Number(pages) : undefined, validDay ?? undefined)
     setNumber('')
     setPages('')
+    setDayId('')
+    setDayError(null)
   }
 
   function handleDeleteUnit(unitId: string, label: string) {
@@ -91,13 +133,25 @@ function UnitsGrid({ planner }: { planner: UsePlannerReturn }) {
                           <td className="py-1.5 pr-2 font-mono">{label}</td>
                           <td className="px-2 py-1.5">
                             {aula && (
-                              <ItemGlyph type="task" done={aula.done} onChange={() => planner.toggleDone(aula.id)} />
+                              <div className="flex flex-col items-start gap-0.5">
+                                <ItemGlyph type="task" done={aula.done} onChange={() => planner.toggleDone(aula.id)} />
+                                <InlineDateEditor
+                                  value={aula.dayId}
+                                  onConfirm={(d) => planner.updateItem(aula.id, { dayId: d, period: null })}
+                                />
+                              </div>
                             )}
                           </td>
                           {reviews.map((review, idx) => (
                             <td key={idx} className="px-2 py-1.5">
                               {review ? (
-                                <ItemGlyph type="task" done={review.done} onChange={() => planner.toggleDone(review.id)} />
+                                <div className="flex flex-col items-start gap-0.5">
+                                  <ItemGlyph type="task" done={review.done} onChange={() => planner.toggleDone(review.id)} />
+                                  <InlineDateEditor
+                                    value={review.dayId}
+                                    onConfirm={(d) => planner.updateItem(review.id, { dayId: d, period: null })}
+                                  />
+                                </div>
                               ) : (
                                 <span className="text-ink-faint">—</span>
                               )}
@@ -165,6 +219,19 @@ function UnitsGrid({ planner }: { planner: UsePlannerReturn }) {
             ))}
           </div>
         </div>
+        <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wide text-ink-faint">
+          Data da aula (opcional)
+          <input
+            value={dayId}
+            onChange={(e) => {
+              setDayId(e.target.value)
+              setDayError(null)
+            }}
+            type="date"
+            className={inputClass}
+          />
+          {dayError && <span className="font-mono text-[9px] text-attention">{dayError}</span>}
+        </label>
         <label className="flex flex-col gap-1 text-[10px] uppercase tracking-wide text-ink-faint">
           Páginas
           <input
