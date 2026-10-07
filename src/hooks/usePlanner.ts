@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_CONTEXT_ID, DEFAULT_CONTEXTS } from '@/lib/contexts'
+import { todayId } from '@/lib/dates'
 import { defaultAnchorDayId } from '@/lib/days'
 import { DEFAULT_DISCIPLINES, ensureDefaultDisciplines } from '@/lib/disciplines'
 import { syncUnitReviews } from '@/lib/facultyReviews'
@@ -414,8 +415,12 @@ export function usePlanner() {
         return s
       }
 
+      // Marcar uma aula sem data agendada como assistida carimba hoje (o dia
+      // em que ela de fato aconteceu) — senão ela nunca aparece no calendário.
+      const stampToday = item.unitRole === 'aula' && !item.dayId && nextDone
+
       let items = s.items.map((it) => {
-        if (it.id === id) return { ...it, done: nextDone }
+        if (it.id === id) return { ...it, done: nextDone, ...(stampToday ? { dayId: todayId(), period: null } : {}) }
         if (opts?.cascadeToChildren && it.parentId === id) return { ...it, done: true }
         return it
       })

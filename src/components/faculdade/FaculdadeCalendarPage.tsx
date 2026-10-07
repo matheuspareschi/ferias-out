@@ -1,8 +1,9 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { ItemGlyph } from '@/components/ItemGlyph'
 import type { UsePlannerReturn } from '@/hooks/usePlanner'
-import { addMonths, daysInMonthCount, isoWeekOf, todayId, weekdayIndexOf, weekdayOf } from '@/lib/dates'
+import { addMonths, todayId } from '@/lib/dates'
 import { isPastDay } from '@/lib/days'
+import { monthWeeks } from '@/lib/habitGrid'
 import type { Item } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
@@ -11,6 +12,8 @@ interface FaculdadeCalendarPageProps {
   month: string
   onMonthChange: (month: string) => void
 }
+
+const WEEKDAY_HEADERS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
 
 function monthLabel(monthId: string): string {
   const [y, m] = monthId.split('-').map(Number)
@@ -21,8 +24,8 @@ function monthLabel(monthId: string): string {
 /**
  * Calendário da Faculdade (mudança radical: app só-faculdade por hora) — só
  * o que tem a ver com disciplina: aulas agendadas, revisões (de Unidade e a
- * contínua de Hebraico), aulas ao vivo e entregas. Compacto igual ao Mês
- * geral (linhas baixas, largura contida, vários itens por linha).
+ * contínua de Hebraico), aulas ao vivo e entregas. Grade de verdade (dom–sáb,
+ * um quadradinho por dia), não lista — o pedido explícito foi "calendário mesmo".
  */
 function itemsForDay(items: Item[], dayId: string): Item[] {
   return items.filter((it) => it.context === 'faculdade' && it.dayId === dayId).sort((a, b) => a.order - b.order)
@@ -36,27 +39,54 @@ function isOverdue(item: Item, dayId: string): boolean {
 function FaculdadeItemLine({ item, dayId, onToggle }: { item: Item; dayId: string; onToggle: () => void }) {
   const overdue = isOverdue(item, dayId)
   return (
-    <div className="flex max-w-[12rem] shrink-0 items-center gap-1 rounded px-0.5 leading-tight">
+    <div className="flex w-full items-start gap-1 rounded px-0.5 leading-tight">
       <ItemGlyph
         type={item.type}
         done={item.done}
         delivery={item.isDelivery}
         onChange={onToggle}
         size="sm"
-        className={overdue ? 'text-attention' : undefined}
+        className={cn('mt-px shrink-0', overdue && 'text-attention')}
       />
-      <span className={cn('truncate text-[10px]', item.done && 'text-ink-faint line-through', overdue && !item.done && 'text-attention')}>
+      <span
+        title={item.title}
+        className={cn('min-w-0 flex-1 truncate text-[9px]', item.done && 'text-ink-faint line-through', overdue && !item.done && 'text-attention')}
+      >
         {item.title}
       </span>
-      {item.timeNote && <span className="shrink-0 font-mono text-[9px] text-ink-faint">{item.timeNote}</span>}
+    </div>
+  )
+}
+
+function DayCell({ dayId, today, planner }: { dayId: string | null; today: string; planner: UsePlannerReturn }) {
+  if (!dayId) return <div className="min-h-24 bg-paper/50" />
+
+  const isToday = dayId === today
+  const dayItems = itemsForDay(planner.items, dayId)
+  const dayNum = Number(dayId.slice(-2))
+  const pending = dayItems.some((it) => isOverdue(it, dayId))
+
+  return (
+    <div
+      className={cn(
+        'flex min-h-24 flex-col gap-0.5 bg-paper p-1',
+        isToday && 'bg-accent-soft/40',
+        pending && 'ring-1 ring-inset ring-attention/60',
+      )}
+    >
+      <span className={cn('font-mono text-[10px]', isToday ? 'font-semibold text-accent' : 'text-ink-dim')}>{dayNum}</span>
+      <div className="flex flex-col gap-0.5">
+        {dayItems.map((item) => (
+          <FaculdadeItemLine key={item.id} item={item} dayId={dayId} onToggle={() => planner.toggleDone(item.id)} />
+        ))}
+      </div>
     </div>
   )
 }
 
 export function FaculdadeCalendarPage({ planner, month, onMonthChange }: FaculdadeCalendarPageProps) {
   const today = todayId()
-  const dayCount = daysInMonthCount(month)
-  const days = Array.from({ length: dayCount }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`)
+  const weeks = monthWeeks(month)
 
   return (
     <div className="flex flex-col gap-3 overflow-y-auto pb-4">
@@ -70,42 +100,15 @@ export function FaculdadeCalendarPage({ planner, month, onMonthChange }: Faculda
         </button>
       </div>
 
-      <div className="mx-auto flex w-full max-w-2xl flex-col rounded-sm border border-line bg-paper-raised/40">
-        {days.map((dayId) => {
-          const isToday = dayId === today
-          const dayItems = itemsForDay(planner.items, dayId)
-          const dayNum = Number(dayId.slice(-2))
-          const pending = dayItems.some((it) => isOverdue(it, dayId))
-          const isSunday = weekdayIndexOf(dayId) === 0
-          return (
-            <div
-              key={dayId}
-              className={cn(
-                'flex items-center gap-2 border-b border-line px-2 py-0.5 last:border-0',
-                isSunday && !isToday && 'border-t-2 border-t-ink-dim/50 bg-paper-dim/40',
-                isToday && 'bg-accent-soft/40',
-                pending && 'border-l-2 border-l-attention',
-              )}
-            >
-              <div className="flex w-10 shrink-0 items-baseline gap-1">
-                <span className={cn('font-mono text-[11px]', isToday ? 'font-semibold text-accent' : pending ? 'text-attention' : 'text-ink-dim')}>
-                  {dayNum}
-                </span>
-                <span className="font-mono text-[8px] uppercase text-ink-faint">{weekdayOf(dayId)}</span>
-                {isSunday && <span className="font-mono text-[8px] text-ink-faint">{isoWeekOf(dayId).split('-W')[1]}</span>}
-              </div>
-              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5 py-0.5">
-                {dayItems.length === 0 ? (
-                  <span className="text-[10px] text-ink-faint">—</span>
-                ) : (
-                  dayItems.map((item) => (
-                    <FaculdadeItemLine key={item.id} item={item} dayId={dayId} onToggle={() => planner.toggleDone(item.id)} />
-                  ))
-                )}
-              </div>
+      <div className="mx-auto w-full max-w-4xl overflow-hidden rounded-sm border border-line">
+        <div className="grid grid-cols-7 gap-px bg-line">
+          {WEEKDAY_HEADERS.map((w) => (
+            <div key={w} className="bg-paper-raised px-1 py-1 text-center font-mono text-[9px] uppercase tracking-wide text-ink-faint">
+              {w}
             </div>
-          )
-        })}
+          ))}
+          {weeks.flatMap((week, wi) => week.map((dayId, di) => <DayCell key={dayId ?? `pad-${wi}-${di}`} dayId={dayId} today={today} planner={planner} />))}
+        </div>
       </div>
 
       <p className="text-center font-mono text-[10px] text-ink-faint">
