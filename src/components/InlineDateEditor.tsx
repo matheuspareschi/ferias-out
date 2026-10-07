@@ -6,6 +6,8 @@ interface InlineDateEditorProps {
   /** "YYYY-MM-DD" ou undefined pra "sem data". */
   value?: string
   onConfirm: (dayId: string) => void
+  /** Presente + `value` definido: mostra "remover data" pra cancelar o agendamento. */
+  onClear?: () => void
   placeholder?: string
   className?: string
 }
@@ -15,7 +17,7 @@ interface InlineDateEditorProps {
  * mesmo padrão de "só grava ao confirmar, valida antes" do resto do app
  * (RowActionMenu/EditItemModal), pra não repetir o bug de data parcial.
  */
-export function InlineDateEditor({ value, onConfirm, placeholder = 'agendar', className }: InlineDateEditorProps) {
+export function InlineDateEditor({ value, onConfirm, onClear, placeholder = 'agendar', className }: InlineDateEditorProps) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -69,6 +71,18 @@ export function InlineDateEditor({ value, onConfirm, placeholder = 'agendar', cl
         <button type="button" onClick={() => setEditing(false)} className="rounded-sm px-1.5 py-0.5 text-[10px] text-ink-faint hover:text-ink">
           cancelar
         </button>
+        {onClear && value && (
+          <button
+            type="button"
+            onClick={() => {
+              onClear()
+              setEditing(false)
+            }}
+            className="rounded-sm px-1.5 py-0.5 text-[10px] text-attention hover:underline"
+          >
+            remover data
+          </button>
+        )}
       </div>
     </div>
   )

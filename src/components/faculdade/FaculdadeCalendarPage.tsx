@@ -44,7 +44,12 @@ function isOverdue(item: Item, dayId: string): boolean {
   return item.type === 'task' && !item.done && isPastDay(dayId)
 }
 
-function FaculdadeItemLine({ item, dayId, onToggle }: { item: Item; dayId: string; onToggle: () => void }) {
+/** Aula/revisão agendadas podem voltar a "sem data" — o resto (entrega, aula ao vivo, revisão contínua) não tem esse estado. */
+function canUnschedule(item: Item): boolean {
+  return item.unitRole === 'aula' || item.unitRole === 'revisao'
+}
+
+function FaculdadeItemLine({ item, dayId, onToggle, onUnschedule }: { item: Item; dayId: string; onToggle: () => void; onUnschedule: () => void }) {
   const overdue = isOverdue(item, dayId)
   return (
     <div className="flex w-full items-start gap-1 rounded px-0.5 leading-tight">
@@ -62,6 +67,20 @@ function FaculdadeItemLine({ item, dayId, onToggle }: { item: Item; dayId: strin
       >
         {item.title}
       </span>
+      {canUnschedule(item) && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onUnschedule()
+          }}
+          className="shrink-0 text-ink-faint hover:text-attention"
+          aria-label={`Cancelar agendamento de ${item.title}`}
+          title="Cancelar agendamento"
+        >
+          <X className="size-2.5" />
+        </button>
+      )}
     </div>
   )
 }
@@ -101,7 +120,13 @@ function DayCell({
       <span className={cn('font-mono text-[10px]', isToday ? 'font-semibold text-accent' : 'text-ink-dim')}>{dayNum}</span>
       <div className="flex flex-col gap-0.5">
         {dayItems.map((item) => (
-          <FaculdadeItemLine key={item.id} item={item} dayId={dayId} onToggle={() => planner.toggleDone(item.id)} />
+          <FaculdadeItemLine
+            key={item.id}
+            item={item}
+            dayId={dayId}
+            onToggle={() => planner.toggleDone(item.id)}
+            onUnschedule={() => planner.updateItem(item.id, { dayId: undefined, period: undefined })}
+          />
         ))}
       </div>
     </div>

@@ -138,6 +138,7 @@ function UnitsGrid({ planner }: { planner: UsePlannerReturn }) {
                                 <InlineDateEditor
                                   value={aula.dayId}
                                   onConfirm={(d) => planner.updateItem(aula.id, { dayId: d, period: null })}
+                                  onClear={() => planner.updateItem(aula.id, { dayId: undefined, period: undefined })}
                                 />
                               </div>
                             )}
@@ -150,6 +151,7 @@ function UnitsGrid({ planner }: { planner: UsePlannerReturn }) {
                                   <InlineDateEditor
                                     value={review.dayId}
                                     onConfirm={(d) => planner.updateItem(review.id, { dayId: d, period: null })}
+                                    onClear={() => planner.updateItem(review.id, { dayId: undefined, period: undefined })}
                                   />
                                 </div>
                               ) : (
