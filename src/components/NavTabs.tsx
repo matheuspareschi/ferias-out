@@ -12,9 +12,11 @@ export type SectionId =
   | 'retrospectiva'
   | 'faculdade-mes'
   | 'faculdade-geral'
+  | 'trabalho'
 
 /** Todas as seções já existentes no app — continuam roteadas no App.tsx, só não ficam no menu por hora (ver ALL_SECTIONS/mudança radical faculdade-only). */
 const ALL_SECTIONS: { id: SectionId; label: string }[] = [
+  { id: 'trabalho', label: 'Trabalho' },
   { id: 'faculdade-mes', label: 'Calendário' },
   { id: 'faculdade-geral', label: 'Disciplinas' },
   { id: 'semana', label: 'Semana' },

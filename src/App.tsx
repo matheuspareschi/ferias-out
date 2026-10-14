@@ -11,6 +11,7 @@ import { NavTabs, type SectionId } from '@/components/NavTabs'
 import { ProjetosPage } from '@/components/projetos/ProjetosPage'
 import { RetrospectivaPage } from '@/components/retrospectiva/RetrospectivaPage'
 import { Toast } from '@/components/Toast'
+import { TrabalhoPage } from '@/components/trabalho/TrabalhoPage'
 import { useGoogleCalendar, type UseGoogleCalendarReturn } from '@/hooks/useGoogleCalendar'
 import { useGoogleSyncedPlanner } from '@/hooks/useGoogleSyncedPlanner'
 import { usePlanner } from '@/hooks/usePlanner'
@@ -163,7 +164,9 @@ export default function App() {
       </header>
 
       <main className="flex flex-1 flex-col overflow-y-auto p-3 sm:p-4 lg:overflow-hidden">
-        {section === 'faculdade-mes' ? (
+        {section === 'trabalho' ? (
+          <TrabalhoPage />
+        ) : section === 'faculdade-mes' ? (
           <FaculdadeCalendarPage planner={syncedPlanner} month={facMonth} onMonthChange={setFacMonth} />
         ) : section === 'faculdade-geral' ? (
           <FaculdadePage planner={syncedPlanner} />
