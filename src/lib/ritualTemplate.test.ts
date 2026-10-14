@@ -47,6 +47,15 @@ describe('renderRitualFile', () => {
     expect(out).toContain('4 - Disposto')
     expect(out).toMatch(/Traballho:\*\* 3\n/)
   })
+
+  it('renders half-point ratings (3.5, 0.5) exactly, with and without comment', () => {
+    const answers = emptyRitualAnswers()
+    answers.abertura_chegada_pessoal = { type: 'rating', rating: 3.5, comment: 'Meio a meio' }
+    answers.abertura_chegada_trabalho = { type: 'rating', rating: 0.5, comment: '' }
+    const out = renderRitualFile(answers)
+    expect(out).toContain('3.5 - Meio a meio')
+    expect(out).toMatch(/Traballho:\*\* 0\.5\n/)
+  })
 })
 
 describe('parseRitualFile', () => {
@@ -154,5 +163,23 @@ describe('parseRitualFile', () => {
 ----
 `
     expect(parseRitualFile(raw)).toEqual(emptyRitualAnswers())
+  })
+
+  it('round-trips half-point ratings across the whole scale, and rejects an invalid value as a comment', () => {
+    const answers: RitualAnswers = {
+      ...emptyRitualAnswers(),
+      abertura_chegada_pessoal: { type: 'rating', rating: 0.5, comment: '' },
+      abertura_chegada_trabalho: { type: 'rating', rating: 3.5, comment: 'Meio a meio' },
+      abertura_chegada_espiritual: { type: 'rating', rating: 4.5, comment: '' },
+    }
+    expect(parseRitualFile(renderRitualFile(answers))).toEqual(answers)
+
+    const parsed = parseRitualFile(
+      renderRitualFile(emptyRitualAnswers()).replace(
+        '- **Pessoal:** = PONTOS DE 1 ATÉ 5 = -= resposta tipo texto =',
+        '- **Pessoal:** 5.5 - nota inválida',
+      ),
+    )
+    expect(parsed.abertura_chegada_pessoal).toEqual({ type: 'rating', rating: null, comment: '5.5 - nota inválida' })
   })
 })

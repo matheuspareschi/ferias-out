@@ -96,6 +96,12 @@ export function useRitualFile() {
     }
   }, [handle, loadFromHandle])
 
+  /** Relê o arquivo do zero — garante que o que aparece na tela é sempre o conteúdo atual do disco. */
+  const reload = useCallback(async () => {
+    if (!handle) return
+    await loadFromHandle(handle)
+  }, [handle, loadFromHandle])
+
   const forget = useCallback(async () => {
     await clearFileHandle()
     setHandle(null)
@@ -125,7 +131,7 @@ export function useRitualFile() {
     [handle],
   )
 
-  return { status, answers, fileName, error, saving, pickFile, reconnect, forget, save, setAnswers }
+  return { status, answers, fileName, error, saving, pickFile, reconnect, forget, save, setAnswers, reload }
 }
 
 export type UseRitualFileReturn = ReturnType<typeof useRitualFile>

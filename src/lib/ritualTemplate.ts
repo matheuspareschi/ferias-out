@@ -191,12 +191,21 @@ function renderTasks(tasks: RitualTask[]): string {
   return tasks.map((t) => `- [${t.done ? 'x' : ' '}] ${t.title}`).join('\n')
 }
 
+/** Nota de 0 a 5 em passos de meio ponto (0, 0.5, 1, 1.5 … 5). */
+function isValidRating(n: number): boolean {
+  return Number.isFinite(n) && n >= 0 && n <= 5 && Math.round(n * 2) === n * 2
+}
+
 function parseRating(raw: string): RitualRatingValue {
   const trimmed = raw.trim()
-  const withComment = /^([1-5])\s*-\s*(.*)$/s.exec(trimmed)
-  if (withComment) return { type: 'rating', rating: Number(withComment[1]), comment: withComment[2].trim() }
-  const onlyNumber = /^([1-5])$/.exec(trimmed)
-  if (onlyNumber) return { type: 'rating', rating: Number(onlyNumber[1]), comment: '' }
+  const withComment = /^(\d+(?:\.5)?)\s*-\s*(.*)$/s.exec(trimmed)
+  if (withComment && isValidRating(Number(withComment[1]))) {
+    return { type: 'rating', rating: Number(withComment[1]), comment: withComment[2].trim() }
+  }
+  const onlyNumber = /^(\d+(?:\.5)?)$/.exec(trimmed)
+  if (onlyNumber && isValidRating(Number(onlyNumber[1]))) {
+    return { type: 'rating', rating: Number(onlyNumber[1]), comment: '' }
+  }
   return { type: 'rating', rating: null, comment: trimmed }
 }
 

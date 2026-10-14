@@ -65,25 +65,28 @@ function TextField({ value, onChange, rows = 3 }: { value: string; onChange: (v:
   )
 }
 
+/** 0 a 5 em passos de meio ponto — mesma faixa que a régua pedida (0, 0.5, 1, 1.5 … 5). */
+function roundToHalf(n: number): number {
+  return Math.min(5, Math.max(0, Math.round(n * 2) / 2))
+}
+
 function RatingRow({ label, value, onChange }: { label: string; value: RitualRatingValue; onChange: (v: RitualRatingValue) => void }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="w-20 shrink-0 text-xs font-semibold text-ink-dim">{label}</span>
-      <div className="flex gap-1">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => onChange({ ...value, rating: n })}
-            className={cn(
-              'size-7 rounded-sm border font-mono text-xs',
-              value.rating === n ? 'border-accent bg-accent text-paper-raised' : 'border-line text-ink-dim hover:border-line-strong',
-            )}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
+      <input
+        type="number"
+        min={0}
+        max={5}
+        step={0.5}
+        value={value.rating ?? ''}
+        onChange={(e) => {
+          const raw = e.target.value
+          onChange({ ...value, rating: raw === '' ? null : roundToHalf(Number(raw)) })
+        }}
+        placeholder="0–5"
+        className={cn(inputClass, 'w-16 text-center font-mono text-sm')}
+      />
       <input
         value={value.comment}
         onChange={(e) => onChange({ ...value, comment: e.target.value })}
@@ -138,7 +141,8 @@ export function TrabalhoPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[800px] flex-col gap-4 overflow-y-auto pb-8">
+    <>
+      <div className="mx-auto flex w-full max-w-[800px] flex-col gap-4 pb-24">
       <h1 className="font-serif text-lg font-semibold">Trabalho — ritual</h1>
 
       {ritual.status === 'checking' && <p className="font-mono text-xs text-ink-faint">verificando acesso ao arquivo…</p>}
@@ -201,9 +205,19 @@ export function TrabalhoPage() {
         <>
           <div className="flex items-center justify-between">
             <span className="font-mono text-[10px] text-ink-faint">{ritual.fileName}</span>
-            <button type="button" onClick={() => void ritual.forget()} className="font-mono text-[10px] text-ink-faint hover:text-attention">
-              trocar arquivo
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void ritual.reload()}
+                className="font-mono text-[10px] text-ink-faint hover:text-ink"
+                title="Recarrega o conteúdo direto do arquivo, descartando alterações não salvas"
+              >
+                recarregar do arquivo
+              </button>
+              <button type="button" onClick={() => void ritual.forget()} className="font-mono text-[10px] text-ink-faint hover:text-attention">
+                trocar arquivo
+              </button>
+            </div>
           </div>
 
           <section className={sectionClass}>
@@ -265,8 +279,13 @@ export function TrabalhoPage() {
               rows={2}
             />
           </section>
+        </>
+      )}
+      </div>
 
-          <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-line bg-paper py-2">
+      {ritual.status === 'ready' && draft && (
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-paper px-3 py-2 shadow-[0_-2px_10px_rgba(0,0,0,0.08)] sm:px-4">
+          <div className="mx-auto flex w-full max-w-[800px] items-center justify-between gap-3">
             <span className="font-mono text-[10px] text-ink-faint">
               {ritual.saving ? 'salvando…' : savedAt ? `salvo às ${savedAt.toLocaleTimeString('pt-BR')}` : ''}
             </span>
@@ -279,8 +298,8 @@ export function TrabalhoPage() {
               Salvar no arquivo
             </button>
           </div>
-        </>
+        </div>
       )}
-    </div>
+    </>
   )
 }
